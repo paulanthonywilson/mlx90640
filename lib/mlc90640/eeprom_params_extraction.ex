@@ -34,4 +34,10 @@ defmodule Mlc90640.EepromParamsExtraction do
     alpha_ptat = alpha_ptat / 4 + 8
     %{params | kv_ptat: kv_ptat, kt_ptat: kt_ptat, v_ptat25: v_ptat25, alpha_ptat: alpha_ptat}
   end
+
+  @spec gain(Params.t(), Eeprom.t()) :: Params.t()
+  def gain(params, %Eeprom{gain_etc: gain_etc}) do
+    <<gain::16>> <> _ = gain_etc
+    %{params | gain: Bytey.two_complement(gain)}
+  end
 end

@@ -126,6 +126,11 @@ defmodule Mlc90640.EepromParamsExtractionTest do
       assert_in_delta alpha_ptat, 15 / 4 + 8, @default_precision
     end
 
+    test "preserves any already populated params values" do
+      assert %Params{vdd_25: 11} =
+               EepromParamsExtraction.ptat(%Params{vdd_25: 11}, @blank_eeprom)
+    end
+
     defp with_vptat25(v_ptat25) do
       %{@blank_eeprom | gain_etc: <<0::16, v_ptat25::16, 0::224>>}
     end
@@ -140,6 +145,33 @@ defmodule Mlc90640.EepromParamsExtractionTest do
 
     defp with_ptat_occ_scale_16(value) do
       %{@blank_eeprom | occ: <<value::16, 0::240>>}
+    end
+  end
+
+  describe "gain" do
+    test "using data sheet example" do
+      assert %Params{
+               gain: 6383
+             } = EepromParamsExtraction.gain(%Params{}, with_gain(0x18EF))
+    end
+
+    test "is two's complement" do
+      assert %Params{
+               gain: 32_767
+             } = EepromParamsExtraction.gain(%Params{}, with_gain(32_767))
+
+      assert %Params{
+               gain: -32_768
+             } = EepromParamsExtraction.gain(%Params{}, with_gain(32_768))
+    end
+
+    test "preserves existing params" do
+      assert %Params{vdd_25: 11} =
+               EepromParamsExtraction.gain(%Params{vdd_25: 11}, @blank_eeprom)
+    end
+
+    defp with_gain(value) do
+      %{@blank_eeprom | gain_etc: <<value::16, 0::240>>}
     end
   end
 end
