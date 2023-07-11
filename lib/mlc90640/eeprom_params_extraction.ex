@@ -28,9 +28,6 @@ defmodule Mlc90640.EepromParamsExtraction do
     kv_ptat = Bytey.two_complement(kv_ptat, 6) / 4096
     kt_ptat = Bytey.two_complement(kt_ptat, 10) / 8
 
-    # The official C driver does not 2's complement v_ptat25
-    # https://github.com/melexis/mlx90640-library/blob/f6be7ca1d4a55146b705f3d347f84b773b29cc86/functions/MLX90640_API.c#L800
-    # The datasheet does, in section 11.1.2
     v_ptat25 = Bytey.two_complement(v_ptat25)
 
     <<alpha_ptat::4, _::4>> <> _ = occ
