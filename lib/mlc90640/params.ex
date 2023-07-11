@@ -4,7 +4,7 @@ defmodule Mlc90640.Params do
   Holds the data extracted from the EEProm
   """
 
-  defstruct [:kv_vdd, :vdd_25, :kv_ptat, :kt_ptat, :v_ptat25, :alpha_ptat, :gain]
+  defstruct [:kv_vdd, :vdd_25, :kv_ptat, :kt_ptat, :v_ptat25, :alpha_ptat, :gain, :tgc]
 
   @type t :: %__MODULE__{
           kv_vdd: integer(),
@@ -13,6 +13,7 @@ defmodule Mlc90640.Params do
           kt_ptat: float(),
           v_ptat25: integer(),
           alpha_ptat: float(),
-          gain: integer()
+          gain: integer(),
+          tgc: float()
         }
 end

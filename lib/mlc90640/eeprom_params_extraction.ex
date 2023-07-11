@@ -40,4 +40,11 @@ defmodule Mlc90640.EepromParamsExtraction do
     <<gain::16>> <> _ = gain_etc
     %{params | gain: Bytey.two_complement(gain)}
   end
+
+  @spec tgc(Params.t(), Eeprom.t()) :: Params.t()
+  def tgc(params, %Eeprom{gain_etc: gain_etc}) do
+    <<_::200, tgc>> <> _ = gain_etc
+    tgc = Bytey.two_complement(tgc, 8) / 32
+    %{params | tgc: tgc}
+  end
 end

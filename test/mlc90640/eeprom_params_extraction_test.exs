@@ -174,4 +174,28 @@ defmodule Mlc90640.EepromParamsExtractionTest do
       %{@blank_eeprom | gain_etc: <<value::16, 0::240>>}
     end
   end
+
+  describe "tgc" do
+    test "preserves any already populated params values" do
+      assert %Params{vdd_25: 11} =
+               EepromParamsExtraction.tgc(%Params{vdd_25: 11}, @blank_eeprom)
+    end
+
+    test "with data sheet example" do
+      assert %Params{tgc: tgc} = EepromParamsExtraction.tgc(%Params{}, with_ksta_tgc(0xF020))
+      assert_in_delta tgc, 1.0, @default_precision
+    end
+
+    test "2's complement tgc in data" do
+      assert %Params{tgc: tgc} = EepromParamsExtraction.tgc(%Params{}, with_ksta_tgc(0x007F))
+      assert_in_delta tgc, 127 / 32, @default_precision
+
+      assert %Params{tgc: tgc} = EepromParamsExtraction.tgc(%Params{}, with_ksta_tgc(0x0080))
+      assert_in_delta tgc, -128 / 32, @default_precision
+    end
+
+    defp with_ksta_tgc(ksta_tgc) do
+      %{@blank_eeprom | gain_etc: <<0::192, ksta_tgc::16, 0::48>>}
+    end
+  end
 end
