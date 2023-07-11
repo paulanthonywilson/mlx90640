@@ -6,9 +6,11 @@ defmodule Mlc90640.ControlTest do
   import Mox
   setup :verify_on_exit!
 
+  alias Mlc90640.Bytey
+
   setup do
     Mox.set_mox_global()
-    :ok
+    {:ok, ref: ref()}
   end
 
   test "starting" do
@@ -25,9 +27,8 @@ defmodule Mlc90640.ControlTest do
     assert :ok == Control.stop(ref())
   end
 
-  test "reading the control registry" do
-    expect(MockI2c, :write_read, fn ref, address, value, length ->
-      assert ref() == ref
+  test "reading the control registry", %{ref: ref} do
+    expect(MockI2c, :write_read, fn ^ref, address, value, length ->
       assert 0x33 == address
       assert value == <<128, 13>>
       assert length == 2
@@ -38,9 +39,7 @@ defmodule Mlc90640.ControlTest do
   end
 
   describe "setting fps" do
-    test "sets the fps" do
-      ref = ref()
-
+    test "sets the fps", %{ref: ref} do
       expect(MockI2c, :write_read, fn ^ref, 0x33, <<128, 13>>, 2 ->
         {:ok, <<0, 0>>}
       end)
@@ -69,6 +68,45 @@ defmodule Mlc90640.ControlTest do
       assert :ok == Control.set_chessboard_and_fps(ref(), 64)
     end
   end
+
+  describe "read eeprom" do
+    setup do
+      eeprom_bytes =
+        0x2400..0x273F
+        |> Enum.map(&Bytey.to_unsigned_2_bytes(&1))
+        |> IO.iodata_to_binary()
+
+      {:ok, eeprom_bytes: eeprom_bytes}
+    end
+
+    test "splits into blocks", %{ref: ref, eeprom_bytes: eeprom_bytes} do
+      expect(MockI2c, :write_read, fn ^ref, 0x33, command, length ->
+        assert command == <<36, 0>>
+
+        assert length == 1664
+        {:ok, eeprom_bytes}
+      end)
+
+      assert {:ok,
+              %{
+                registers: registers,
+                occ: occ,
+                acc: acc,
+                gain_etc: gain_etc,
+                pixel_offsets: pixel_offsets
+              }} = Control.read_eeprom(ref)
+
+      assert list(0x2400, 0x240F) == Bytey.bin_to_values(registers)
+      assert list(0x2410, 0x241F) == Bytey.bin_to_values(occ)
+      assert list(0x2420, 0x242F) == Bytey.bin_to_values(acc)
+      assert list(0x2430, 0x243F) == Bytey.bin_to_values(gain_etc)
+      assert list(0x2440, 0x273F) == Bytey.bin_to_values(pixel_offsets)
+
+      assert registers <> occ <> acc <> gain_etc <> pixel_offsets == eeprom_bytes
+    end
+  end
+
+  defp list(start, finish), do: start..finish |> Enum.to_list()
 
   defp ref do
     :erlang.list_to_ref(~c"#Ref<0.1.2.3>")
