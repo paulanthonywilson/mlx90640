@@ -47,4 +47,45 @@ defmodule Mlc90640.EepromParamsExtraction do
     tgc = Bytey.two_complement(tgc, 8) / 32
     %{params | tgc: tgc}
   end
+
+  @spec ksta(Params.t(), Eeprom.t()) :: Params.t()
+  def ksta(params, %Eeprom{gain_etc: gain_etc}) do
+    <<_::192, ksta>> <> _ = gain_etc
+    ksta = Bytey.two_complement(ksta, 8) / 8192
+    %{params | ksta: ksta}
+  end
+
+  @spec ksto(Params.t(), Eeprom.t()) :: Params.t()
+  def ksto(params, %Eeprom{gain_etc: gain_etc}) do
+    <<_::208, ks_to_1, ks_to_0, ks_to_3, ks_to_2, _::2, step::2, ct_3::4, ct_2::4,
+      ks_to_scale::4>> = gain_etc
+
+    ks_to_scale = ks_to_scale + 8
+    ks_divisor = 1 <<< ks_to_scale
+    step = step * 10
+    ct_2 = ct_2 * step
+    ct_3 = ct_2 + ct_3 * step
+
+    ks_to_0 = Bytey.two_complement(ks_to_0, 8) / ks_divisor
+    ks_to_1 = Bytey.two_complement(ks_to_1, 8) / ks_divisor
+    ks_to_2 = Bytey.two_complement(ks_to_2, 8) / ks_divisor
+    ks_to_3 = Bytey.two_complement(ks_to_3, 8) / ks_divisor
+
+    ks_to = %Params.KsTo{
+      ks_to_scale: ks_to_scale,
+      step: step,
+      ct_2: ct_2,
+      ct_3: ct_3,
+      ks_to_0: ks_to_0,
+      ks_to_1: ks_to_1,
+      ks_to_2: ks_to_2,
+      ks_to_3: ks_to_3
+    }
+
+    %{params | ks_to: ks_to}
+  end
+
+  def read_alpha_scale(%{acc: <<alpha_scale::4, _::4>> <> _}) do
+    alpha_scale + 27
+  end
 end

@@ -3,14 +3,6 @@ defmodule Mlc90640.EepromParamsExtractionTest do
   import Bitwise
   alias Mlc90640.{Bytey, Eeprom, EepromParamsExtraction, Params}
 
-  @blank_eeprom %Eeprom{
-    registers: <<0::256>>,
-    occ: <<0::256>>,
-    acc: <<0::256>>,
-    gain_etc: <<0::256>>,
-    pixel_offsets: <<0::1536>>
-  }
-
   @default_precision 1.0e-9
 
   describe "vdd" do
@@ -33,7 +25,7 @@ defmodule Mlc90640.EepromParamsExtractionTest do
     end
 
     defp with_vdd(kv_vdd, vdd_25) do
-      %{@blank_eeprom | gain_etc: <<0::48, kv_vdd, vdd_25, 0::192>>}
+      %Eeprom{gain_etc: <<0::48, kv_vdd, vdd_25, 0::192>>}
     end
   end
 
@@ -44,7 +36,7 @@ defmodule Mlc90640.EepromParamsExtractionTest do
                kt_ptat: kt_ptat,
                v_ptat25: v_ptat25,
                alpha_ptat: alpha_ptat
-             } = EepromParamsExtraction.ptat(%Params{}, @blank_eeprom)
+             } = EepromParamsExtraction.ptat(%Params{}, %Eeprom{})
 
       assert_in_delta kv_ptat, 0.0, @default_precision
       assert_in_delta kt_ptat, 0.0, @default_precision
@@ -128,11 +120,11 @@ defmodule Mlc90640.EepromParamsExtractionTest do
 
     test "preserves any already populated params values" do
       assert %Params{vdd_25: 11} =
-               EepromParamsExtraction.ptat(%Params{vdd_25: 11}, @blank_eeprom)
+               EepromParamsExtraction.ptat(%Params{vdd_25: 11}, %Eeprom{})
     end
 
     defp with_vptat25(v_ptat25) do
-      %{@blank_eeprom | gain_etc: <<0::16, v_ptat25::16, 0::224>>}
+      %Eeprom{gain_etc: <<0::16, v_ptat25::16, 0::224>>}
     end
 
     defp with_ptat(kvptat, ktptat) do
@@ -140,11 +132,11 @@ defmodule Mlc90640.EepromParamsExtractionTest do
     end
 
     defp with_ptat(ptat16bit) do
-      %{@blank_eeprom | gain_etc: <<0::32, ptat16bit::16, 0::208>>}
+      %Eeprom{gain_etc: <<0::32, ptat16bit::16, 0::208>>}
     end
 
     defp with_ptat_occ_scale_16(value) do
-      %{@blank_eeprom | occ: <<value::16, 0::240>>}
+      %Eeprom{occ: <<value::16, 0::240>>}
     end
   end
 
@@ -167,18 +159,18 @@ defmodule Mlc90640.EepromParamsExtractionTest do
 
     test "preserves existing params" do
       assert %Params{vdd_25: 11} =
-               EepromParamsExtraction.gain(%Params{vdd_25: 11}, @blank_eeprom)
+               EepromParamsExtraction.gain(%Params{vdd_25: 11}, %Eeprom{})
     end
 
     defp with_gain(value) do
-      %{@blank_eeprom | gain_etc: <<value::16, 0::240>>}
+      %Eeprom{gain_etc: <<value::16, 0::240>>}
     end
   end
 
   describe "tgc" do
     test "preserves any already populated params values" do
       assert %Params{vdd_25: 11} =
-               EepromParamsExtraction.tgc(%Params{vdd_25: 11}, @blank_eeprom)
+               EepromParamsExtraction.tgc(%Params{vdd_25: 11}, %Eeprom{})
     end
 
     test "with data sheet example" do
@@ -193,9 +185,116 @@ defmodule Mlc90640.EepromParamsExtractionTest do
       assert %Params{tgc: tgc} = EepromParamsExtraction.tgc(%Params{}, with_ksta_tgc(0x0080))
       assert_in_delta tgc, -128 / 32, @default_precision
     end
+  end
 
-    defp with_ksta_tgc(ksta_tgc) do
-      %{@blank_eeprom | gain_etc: <<0::192, ksta_tgc::16, 0::48>>}
+  describe "ksta" do
+    test "preserves any already populated params values" do
+      assert %Params{vdd_25: 11} =
+               EepromParamsExtraction.ksta(%Params{vdd_25: 11}, %Eeprom{})
     end
+
+    test "with data sheet example" do
+      assert %Params{ksta: ksta} = EepromParamsExtraction.ksta(%Params{}, with_ksta_tgc(0xF020))
+      assert_in_delta ksta, -0.001953125, @default_precision
+    end
+
+    test "2's complement" do
+      assert %Params{ksta: ksta} = EepromParamsExtraction.ksta(%Params{}, with_ksta_tgc(0x7F00))
+      assert_in_delta ksta, 127 / 8192.0, @default_precision
+      assert %Params{ksta: ksta} = EepromParamsExtraction.ksta(%Params{}, with_ksta_tgc(0x8000))
+      assert_in_delta ksta, -128 / 8192.0, @default_precision
+    end
+  end
+
+  describe "ksto" do
+    test "preserves any already populated params values" do
+      assert %Params{vdd_25: 11} =
+               EepromParamsExtraction.ksto(%Params{vdd_25: 11}, %Eeprom{})
+    end
+
+    test "with data sheet example" do
+      assert %Params{
+               ks_to: %{
+                 ks_to_0: ks_to_0,
+                 ks_to_1: ks_to_1,
+                 ks_to_2: ks_to_2,
+                 ks_to_3: ks_to_3,
+                 ks_to_4: ks_to_4,
+                 ct_0: -40,
+                 ct_1: 0,
+                 ct_2: 160,
+                 ct_3: 320,
+                 ct_4: 400,
+                 step: 20,
+                 ks_to_scale: 17
+               }
+             } = EepromParamsExtraction.ksto(%Params{}, with_ksto(0x9797, 0x9797, 0x2889))
+
+      assert_in_delta ks_to_0, -0.0008010864, @default_precision
+      assert_in_delta ks_to_1, -0.0008010864, @default_precision
+      assert_in_delta ks_to_2, -0.0008010864, @default_precision
+      assert_in_delta ks_to_3, -0.0008010864, @default_precision
+      assert_in_delta ks_to_4, -0.0002, @default_precision
+    end
+
+    test "with varied ct and step" do
+      assert %{ks_to: %{ct_2: 110, ct_3: 210, step: 10}} =
+               EepromParamsExtraction.ksto(%Params{}, with_ksto(0, 0, 0x01AB1))
+    end
+
+    test "varying ks_scale" do
+      assert %{
+               ks_to: %{
+                 ks_to_0: ks_to_0,
+                 ks_to_1: ks_to_1,
+                 ks_to_2: ks_to_2,
+                 ks_to_3: ks_to_3,
+                 ks_to_4: ks_to_4,
+                 ks_to_scale: 13
+               }
+             } =
+               EepromParamsExtraction.ksto(%Params{}, with_ksto(0x9797, 0x9797, 0x5))
+
+      assert_in_delta ks_to_0, -0.0128173828125, @default_precision
+      assert_in_delta ks_to_1, -0.0128173828125, @default_precision
+      assert_in_delta ks_to_2, -0.0128173828125, @default_precision
+      assert_in_delta ks_to_3, -0.0128173828125, @default_precision
+      assert_in_delta ks_to_4, -0.0002, @default_precision
+    end
+
+    test "positive configured ks values" do
+      assert %{
+               ks_to: %{
+                 ks_to_0: ks_to_0,
+                 ks_to_1: ks_to_1,
+                 ks_to_2: ks_to_2,
+                 ks_to_3: ks_to_3,
+                 ks_to_4: ks_to_4,
+                 ks_to_scale: 8
+               }
+             } =
+               EepromParamsExtraction.ksto(%Params{}, with_ksto(0x7E7F, 0x7C7D, 0))
+
+      assert_in_delta ks_to_0, 127 / 256, @default_precision
+      assert_in_delta ks_to_1, 126 / 256, @default_precision
+      assert_in_delta ks_to_2, 125 / 256, @default_precision
+      assert_in_delta ks_to_3, 124 / 256, @default_precision
+      assert_in_delta ks_to_4, -0.0002, @default_precision
+    end
+
+    defp with_ksto(ksto2_1, ksto_4_3, ct) do
+      %Eeprom{gain_etc: <<0::208, ksto2_1::16, ksto_4_3::16, ct::16>>}
+    end
+  end
+
+  test "reading alpha scale" do
+    for i <- 0..0xF do
+      eeprom = %Eeprom{acc: <<i::4, 0::252>>}
+      assert i + 27 == EepromParamsExtraction.read_alpha_scale(eeprom)
+    end
+  end
+
+  defp with_ksta_tgc(ksta_tgc) do
+    %Eeprom{gain_etc: <<0::192, ksta_tgc::16, 0::48>>}
   end
 end

@@ -4,9 +4,11 @@ defmodule Mlc90640.Eeprom do
   Struct holding Eeprom split into areas for ease of access
   """
 
-  keys = [:registers, :occ, :acc, :gain_etc, :pixel_offsets]
-  @enforce_keys keys
-  defstruct keys
+  defstruct registers: <<0::256>>,
+            occ: <<0::256>>,
+            acc: <<0::256>>,
+            gain_etc: <<0::256>>,
+            pixel_offsets: <<0::1536>>
 
   @type t :: %__MODULE__{
           registers: binary(),
