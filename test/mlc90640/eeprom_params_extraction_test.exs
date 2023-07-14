@@ -290,7 +290,91 @@ defmodule Mlc90640.EepromParamsExtractionTest do
   test "reading alpha scale" do
     for i <- 0..0xF do
       eeprom = %Eeprom{acc: <<i::4, 0::252>>}
-      assert i + 27 == EepromParamsExtraction.read_alpha_scale(eeprom)
+      assert i == EepromParamsExtraction.read_alpha_scale(eeprom)
+    end
+  end
+
+  describe "extract cpp parameters" do
+    test "preserves any already populated params values" do
+      assert %Params{vdd_25: 11} =
+               EepromParamsExtraction.cp(%Params{vdd_25: 11}, %Eeprom{})
+    end
+
+    test "matches the library extraction on a device" do
+      assert %{
+               cp: %{
+                 kv: kv,
+                 kta: kta,
+                 alpha_0: alpha_0,
+                 alpha_1: alpha_1,
+                 offset_0: -68,
+                 offset_1: -62
+               }
+             } = EepromParamsExtraction.cp(%Params{}, ExampleEeprom.eeprom())
+
+      assert_in_delta kv, 0.375, @default_precision
+      assert_in_delta kta, 4.455566e-03, @default_precision
+      assert_in_delta alpha_0, 4.016329e-9, 1.0e-12
+      assert_in_delta alpha_1, 3.953573e-9, 1.0e-12
+    end
+
+    test "negative kta" do
+      eeprom = (59 * 2 + 1) |> ExampleEeprom.substitute_raw_bytes(<<0xFF>>) |> Eeprom.new()
+      assert %{cp: %{kta: kta}} = EepromParamsExtraction.cp(%Params{}, eeprom)
+      assert_in_delta kta, -6.103515625e-5, @default_precision
+    end
+
+    test "negative kv" do
+      eeprom = (59 * 2) |> ExampleEeprom.substitute_raw_bytes(<<0xFF>>) |> Eeprom.new()
+      assert %{cp: %{kv: kv}} = EepromParamsExtraction.cp(%Params{}, eeprom)
+      assert_in_delta kv, -0.125, @default_precision
+    end
+
+    test "positive offsets" do
+      eeprom = (58 * 2) |> ExampleEeprom.substitute_raw_bytes(<<31::6, 511::10>>) |> Eeprom.new()
+
+      assert %{
+               cp: %{offset_0: 511, offset_1: 542}
+             } = EepromParamsExtraction.cp(%Params{}, eeprom)
+    end
+
+    test "positive alphas" do
+      eeprom = (57 * 2) |> ExampleEeprom.substitute_raw_bytes(<<31::6, 511::10>>) |> Eeprom.new()
+
+      assert %{cp: %{alpha_0: alpha_0, alpha_1: alpha_1}} =
+               EepromParamsExtraction.cp(%Params{}, eeprom)
+
+      assert_in_delta alpha_0,
+                      511 / 2 ** (27 + EepromParamsExtraction.read_alpha_scale(eeprom)),
+                      1.0e-12
+
+      assert_in_delta alpha_1, (1 + 31 / 128) * alpha_0, 1.0e-15
+    end
+  end
+
+  describe "alpha" do
+    test "preserves any already populated params values" do
+      assert %Params{vdd_25: 11} = alphas_from_melixis_lib(%Params{vdd_25: 11})
+    end
+
+    test "matches the melixis library alpha scale" do
+      assert %{alpha_scale: 11} = alphas_from_melixis_lib()
+    end
+
+    test "matches the melixis library alphas" do
+      assert %{alphas: alphas} = alphas_from_melixis_lib()
+
+      assert Enum.take(alphas, 20) == Enum.take(ExampleEeprom.expected_alphas(), 20)
+      assert alphas == ExampleEeprom.expected_alphas()
+    end
+
+    defp alphas_from_melixis_lib(params \\ %Params{}) do
+      eeprom = ExampleEeprom.eeprom()
+
+      params
+      |> EepromParamsExtraction.tgc(eeprom)
+      |> EepromParamsExtraction.cp(eeprom)
+      |> EepromParamsExtraction.alpha(ExampleEeprom.eeprom())
     end
   end
 

@@ -56,14 +56,7 @@ defmodule Mlc90640.Control do
   def read_eeprom(bus) do
     case I2C.write_read(bus, @mlc90640_addr, @eeprom_start, @eeprom_byte_size) do
       {:ok, eeprom} ->
-        {:ok,
-         %Eeprom{
-           registers: binary_part(eeprom, 0, 0x20),
-           occ: binary_part(eeprom, 0x20, 0x20),
-           acc: binary_part(eeprom, 0x40, 0x20),
-           gain_etc: binary_part(eeprom, 0x60, 0x20),
-           pixel_offsets: binary_part(eeprom, 0x80, 0x600)
-         }}
+        {:ok, Eeprom.new(eeprom)}
     end
   end
 

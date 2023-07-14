@@ -35,6 +35,20 @@ defmodule Mlc90640.Params do
           }
   end
 
+  defmodule Cp do
+    @moduledoc false
+    defstruct [:kv, :kta, :alpha_0, :alpha_1, :offset_0, :offset_1]
+
+    @type t :: %__MODULE__{
+            kv: float(),
+            kta: float(),
+            alpha_0: float(),
+            alpha_1: float(),
+            offset_0: integer(),
+            offset_1: integer()
+          }
+  end
+
   defstruct [
     :kv_vdd,
     :vdd_25,
@@ -45,7 +59,10 @@ defmodule Mlc90640.Params do
     :gain,
     :tgc,
     :ksta,
-    :ks_to
+    :ks_to,
+    :cp,
+    :alpha_scale,
+    :alphas
   ]
 
   @type t :: %__MODULE__{
@@ -58,6 +75,9 @@ defmodule Mlc90640.Params do
           gain: integer(),
           tgc: float(),
           ksta: float(),
-          ks_to: KsTo.t()
+          ks_to: KsTo.t(),
+          cp: Cp.t(),
+          alpha_scale: pos_integer(),
+          alphas: list(pos_integer())
         }
 end

@@ -14,8 +14,8 @@ defmodule Mlc90640.Bytey do
     <<i >>> 8, i &&& 0xFF>>
   end
 
-  def bin_to_values(bin) do
-    for <<i::size(16) <- bin>>, do: i
+  def bin_to_values(bin, bit_count \\ 16) do
+    for <<i::size(bit_count) <- bin>>, do: i
   end
 
   @spec two_complement(non_neg_integer(), pos_integer()) :: integer()

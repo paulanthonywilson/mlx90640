@@ -25,6 +25,16 @@ defmodule Mlc90640.ByteyTest do
       assert [256] = Bytey.bin_to_values(<<1, 0>>)
       assert [256, 255] = Bytey.bin_to_values(<<1, 0, 0, 255>>)
     end
+
+    test "8 bit list" do
+      assert [] = Bytey.bin_to_values(<<>>, 8)
+      assert [0, 1] = Bytey.bin_to_values(<<0, 1>>, 8)
+    end
+
+    test "4 bits" do
+      assert [] = Bytey.bin_to_values(<<>>, 4)
+      assert [0xF, 0xA, 0x1, 0x2] = Bytey.bin_to_values(<<0xFA, 0x12>>, 4)
+    end
   end
 
   describe "two complement" do

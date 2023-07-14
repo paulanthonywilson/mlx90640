@@ -6,9 +6,11 @@ defmodule Mlc90640.EepromParamsExtraction do
 
   import Bitwise
 
-  alias Mlc90640.{Bytey, Eeprom, Params}
+  alias Mlc90640.{Bytey, Eeprom, Params, Pixels}
 
   @two_pow_13 2 ** 13
+
+  @scale_alpha 0.000001
 
   @spec vdd(Params.t(), Eeprom.t()) :: Params.t()
   def vdd(params, %Eeprom{gain_etc: gain_etc}) do
@@ -85,7 +87,96 @@ defmodule Mlc90640.EepromParamsExtraction do
     %{params | ks_to: ks_to}
   end
 
-  def read_alpha_scale(%{acc: <<alpha_scale::4, _::4>> <> _}) do
-    alpha_scale + 27
+  @spec cp(Params.t(), Eeprom.t()) :: Params.t()
+  def cp(params, %{gain_etc: gain_etc} = eeprom) do
+    <<_::128, _::4, kv_scale::4, kta_scale_1::4, _::4, alpha_1::6, alpha_0::10, offset_1::6,
+      offset_0::10, kv, kta>> <> _ = gain_etc
+
+    offset_0 = Bytey.two_complement(offset_0, 10)
+
+    offset_1 = Bytey.two_complement(offset_1, 6) + offset_0
+
+    kv = Bytey.two_complement(kv, 8) / 2 ** kv_scale
+
+    alpha_0 = Bytey.two_complement(alpha_0, 10) / 2 ** (27 + read_alpha_scale(eeprom))
+    alpha_1 = (1 + Bytey.two_complement(alpha_1, 6) / 128) * alpha_0
+    kta = Bytey.two_complement(kta, 8) / 2 ** (kta_scale_1 + 8)
+
+    %{
+      params
+      | cp: %Params.Cp{
+          offset_0: offset_0,
+          offset_1: offset_1,
+          alpha_0: alpha_0,
+          alpha_1: alpha_1,
+          kv: kv,
+          kta: kta
+        }
+    }
+  end
+
+  @spec alpha(Params.t(), Eeprom.t()) :: Params.t()
+  def alpha(params, %{acc: acc, pixel_offsets: pixel_offsets}) do
+    <<working_alpha_scale::4, acc_row_scale::4, acc_col_scale::4, acc_remnand_scale::4,
+      alpha_ref::16>> <>
+      acc_row_cols_bin = acc
+
+    working_alpha_scale = working_alpha_scale + 30
+    alpha_ref = Bytey.two_complement(alpha_ref)
+
+    {acc_row, acc_col} =
+      acc_row_cols_bin
+      |> Bytey.bin_to_values(4)
+      |> Enum.map(&Bytey.two_complement(&1, 4))
+      |> Enum.chunk_every(4)
+      |> Enum.map(&Enum.reverse/1)
+      |> List.flatten()
+      |> Enum.split(Pixels.row_count())
+
+    acc_row =
+      acc_row
+      |> Enum.map(&(&1 <<< acc_row_scale))
+      |> :array.from_list()
+
+    acc_col =
+      acc_col
+      |> Enum.map(&(&1 <<< acc_col_scale))
+      |> :array.from_list()
+
+    alpha_temp =
+      for(<<_::6, alpha_temp::6, _::4 <- pixel_offsets>>, do: Bytey.two_complement(alpha_temp, 6))
+      |> Enum.with_index()
+      |> Enum.map(fn {value, i} ->
+        {x, y} = Pixels.row_and_column(i)
+
+        value =
+          value * (1 <<< acc_remnand_scale)
+
+        value = value + :array.get(x, acc_row)
+        value = value + :array.get(y, acc_col)
+        value = value + alpha_ref
+        value = value / 2 ** working_alpha_scale
+        value = value - params.tgc * (params.cp.alpha_0 + params.cp.alpha_1) / 2
+        @scale_alpha / value
+      end)
+
+    alpha_scale = alpha_temp |> Enum.max() |> alpha_scale_from_max_temp()
+    alpha_scale_2pow = 2 ** alpha_scale
+
+    alphas = Enum.map(alpha_temp, fn at -> trunc(0.5 + at * alpha_scale_2pow) end)
+
+    %{params | alpha_scale: alpha_scale, alphas: alphas}
+  end
+
+  defp alpha_scale_from_max_temp(temp, alpha_scale \\ 0)
+
+  defp alpha_scale_from_max_temp(temp, alpha_scale) when temp < 32_767.4 do
+    alpha_scale_from_max_temp(temp * 2, alpha_scale + 1)
+  end
+
+  defp alpha_scale_from_max_temp(_, alpha_scale), do: alpha_scale
+
+  def(read_alpha_scale(%{acc: <<alpha_scale::4, _::4>> <> _})) do
+    alpha_scale
   end
 end
