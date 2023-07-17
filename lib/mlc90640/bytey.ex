@@ -25,7 +25,8 @@ defmodule Mlc90640.Bytey do
     max = Integer.floor_div(neg_subtract, 2) - 1
 
     if value > max do
-      raise_for_overflow(value - neg_subtract, bit_count)
+      (value - neg_subtract)
+      |> raise_for_overflow(bit_count)
     else
       value
     end

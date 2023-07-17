@@ -6,7 +6,7 @@ defmodule Mlc90640.EepromParamsExtraction do
 
   import Bitwise
 
-  alias Mlc90640.{Bytey, Eeprom, Params, Pixels}
+  alias Mlc90640.{Bytey, Eeprom, Mathy, Params, Pixels}
 
   @two_pow_13 2 ** 13
 
@@ -160,21 +160,13 @@ defmodule Mlc90640.EepromParamsExtraction do
         @scale_alpha / value
       end)
 
-    alpha_scale = alpha_temp |> Enum.max() |> alpha_scale_from_max_temp()
+    alpha_scale = alpha_temp |> Enum.max() |> Mathy.maximum_doubling_while_less_than(32_767.4)
     alpha_scale_2pow = 2 ** alpha_scale
 
     alphas = Enum.map(alpha_temp, fn at -> trunc(0.5 + at * alpha_scale_2pow) end)
 
     %{params | alpha_scale: alpha_scale, alphas: alphas}
   end
-
-  defp alpha_scale_from_max_temp(temp, alpha_scale \\ 0)
-
-  defp alpha_scale_from_max_temp(temp, alpha_scale) when temp < 32_767.4 do
-    alpha_scale_from_max_temp(temp * 2, alpha_scale + 1)
-  end
-
-  defp alpha_scale_from_max_temp(_, alpha_scale), do: alpha_scale
 
   def(read_alpha_scale(%{acc: <<alpha_scale::4, _::4>> <> _})) do
     alpha_scale
