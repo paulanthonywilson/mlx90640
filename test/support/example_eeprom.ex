@@ -7,6 +7,13 @@ defmodule ExampleEeprom do
 
   alias Mlc90640.Eeprom
 
+  read_expected = fn file_name ->
+    __DIR__
+    |> Path.join(file_name)
+    |> File.read!()
+    |> :erlang.binary_to_term()
+  end
+
   @raw_eeprom __DIR__ |> Path.join("eeprom.bin") |> File.read!()
 
   @expected_alphas __DIR__
@@ -14,7 +21,18 @@ defmodule ExampleEeprom do
                    |> File.read!()
                    |> :erlang.binary_to_term()
 
+  @expected_offsets __DIR__
+                    |> Path.join("expected_offsets")
+                    |> File.read!()
+                    |> :erlang.binary_to_term()
+
+  @expected_ktas read_expected.("expected_ktas")
+
+  def expected_ktas, do: @expected_ktas
+
   def expected_alphas, do: @expected_alphas
+
+  def expected_offsets, do: @expected_offsets
 
   def raw_eeprom, do: @raw_eeprom
 

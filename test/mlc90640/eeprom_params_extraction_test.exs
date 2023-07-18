@@ -296,8 +296,7 @@ defmodule Mlc90640.EepromParamsExtractionTest do
 
   describe "extract cpp parameters" do
     test "preserves any already populated params values" do
-      assert %Params{vdd_25: 11} =
-               EepromParamsExtraction.cp(%Params{vdd_25: 11}, %Eeprom{})
+      assert %Params{vdd_25: 11} = EepromParamsExtraction.cp(%Params{vdd_25: 11}, %Eeprom{})
     end
 
     test "matches the library extraction on a device" do
@@ -375,6 +374,61 @@ defmodule Mlc90640.EepromParamsExtractionTest do
       |> EepromParamsExtraction.tgc(eeprom)
       |> EepromParamsExtraction.cp(eeprom)
       |> EepromParamsExtraction.alpha(ExampleEeprom.eeprom())
+    end
+  end
+
+  describe "offsets" do
+    test "preserves any already populated params values" do
+      assert %Params{vdd_25: 11} = EepromParamsExtraction.offsets(%Params{vdd_25: 11}, %Eeprom{})
+    end
+
+    test "matches the output from the melixis library" do
+      assert %{offsets: offsets} =
+               EepromParamsExtraction.offsets(%Params{}, ExampleEeprom.eeprom())
+
+      assert Enum.take(offsets, 10) == Enum.take(ExampleEeprom.expected_offsets(), 10)
+      assert offsets == ExampleEeprom.expected_offsets()
+    end
+
+    test "with non-zero rem scale" do
+      %{occ: occ} = eeprom = ExampleEeprom.eeprom()
+      <<_::8, col_scale::4, _::4>> <> _ = occ
+
+      # make rem scale 3, which will multiple by 2 to the power of 3, being 8
+      scale2 = col_scale * 16 + 3
+      eeprom = %{eeprom | occ: binary_part(occ, 0, 1) <> <<scale2::8>> <> binary_part(occ, 2, 30)}
+
+      # The first pixel offset in Eeprom is 3. The scaled result for that pixel is -42.
+      # We'll just prove that below
+      assert %{pixel_offsets: <<3::6, _::2>> <> _} = eeprom
+      assert [-42 | _] = ExampleEeprom.expected_offsets()
+
+      # with multiplying by 9 we now expect the value to be
+      # = -41 + (3 * 8) - 3
+      # = -41 + 24 - 3
+      # = -41 + 21
+      # = -21
+      assert %{offsets: [-21 | _]} =
+               EepromParamsExtraction.offsets(%Params{}, eeprom)
+    end
+  end
+
+  describe "kta_pixels" do
+    test "preserves any already populated params values" do
+      assert %Params{vdd_25: 11} =
+               EepromParamsExtraction.kta_pixels(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
+    end
+
+    test "kta scale" do
+      assert %Params{kta_scale: 14} =
+               EepromParamsExtraction.kta_pixels(%Params{}, ExampleEeprom.eeprom())
+    end
+
+    test "ktas" do
+      assert %Params{ktas: ktas} =
+               EepromParamsExtraction.kta_pixels(%Params{}, ExampleEeprom.eeprom())
+
+      assert Enum.take(ktas, 10) == Enum.take(ExampleEeprom.expected_ktas(), 10)
     end
   end
 

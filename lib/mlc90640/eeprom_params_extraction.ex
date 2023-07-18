@@ -124,31 +124,10 @@ defmodule Mlc90640.EepromParamsExtraction do
     working_alpha_scale = working_alpha_scale + 30
     alpha_ref = Bytey.two_complement(alpha_ref)
 
-    {acc_row, acc_col} =
-      acc_row_cols_bin
-      |> Bytey.bin_to_values(4)
-      |> Enum.map(&Bytey.two_complement(&1, 4))
-      |> Enum.chunk_every(4)
-      |> Enum.map(&Enum.reverse/1)
-      |> List.flatten()
-      |> Enum.split(Pixels.row_count())
-
-    acc_row =
-      acc_row
-      |> Enum.map(&(&1 <<< acc_row_scale))
-      |> :array.from_list()
-
-    acc_col =
-      acc_col
-      |> Enum.map(&(&1 <<< acc_col_scale))
-      |> :array.from_list()
+    {acc_row, acc_col} = row_cols(acc_row_cols_bin, acc_row_scale, acc_col_scale)
 
     alpha_temp =
-      for(<<_::6, alpha_temp::6, _::4 <- pixel_offsets>>, do: Bytey.two_complement(alpha_temp, 6))
-      |> Enum.with_index()
-      |> Enum.map(fn {value, i} ->
-        {x, y} = Pixels.row_and_column(i)
-
+      for_each_pixel_param(pixel_offsets, 6, 6, fn value, _i, x, y ->
         value =
           value * (1 <<< acc_remnand_scale)
 
@@ -166,6 +145,95 @@ defmodule Mlc90640.EepromParamsExtraction do
     alphas = Enum.map(alpha_temp, fn at -> trunc(0.5 + at * alpha_scale_2pow) end)
 
     %{params | alpha_scale: alpha_scale, alphas: alphas}
+  end
+
+  @spec offsets(Params.t(), Eeprom.t()) :: Params.t()
+  def offsets(params, %{occ: occ, pixel_offsets: pixel_offsets}) do
+    <<_::4, occ_row_scale::4, occ_col_scale::4, occ_rem_scale::4, offset_ref::16>> <> occ_row_cols =
+      occ
+
+    occ_rem_scale = 2 ** occ_rem_scale
+    offset_ref = Bytey.two_complement(offset_ref)
+    {occ_rows, occ_cols} = row_cols(occ_row_cols, occ_row_scale, occ_col_scale)
+
+    offsets =
+      for_each_pixel_param(pixel_offsets, 0, 6, fn value, _i, x, y ->
+        value = value * occ_rem_scale
+        value = value + offset_ref
+        value = value + :array.get(x, occ_rows)
+        value + :array.get(y, occ_cols)
+      end)
+
+    %{params | offsets: offsets}
+  end
+
+  @spec kta_pixels(Params.t(), Eeprom.t()) :: Params.t()
+  def kta_pixels(params, %{gain_etc: gain_etc, pixel_offsets: pixel_offsets}) do
+    <<_::96, rc_0::8, rc_2::8, rc_1::8, rc_3::8, _::8, kta_scale_1::4, kta_scale_2::4>> <> _ =
+      gain_etc
+
+    rcs =
+      Enum.map([rc_0, rc_1, rc_2, rc_3], &Bytey.two_complement(&1, 8))
+
+    kta_scale_1 = 2 ** (8 + kta_scale_1)
+    kta_scale_2 = 2 ** kta_scale_2
+
+    ktas =
+      for_each_pixel_param(pixel_offsets, 12, 3, fn value, i, _x, _y ->
+        split = 2 * (Integer.floor_div(i, 32) - Integer.floor_div(i, 64) * 2) + rem(i, 2)
+        value = value * kta_scale_2
+        value = value + Enum.at(rcs, split)
+        value / kta_scale_1
+      end)
+
+    max_absolute = ktas |> Enum.map(&Kernel.abs/1) |> Enum.max()
+
+    kta_scale = Mathy.maximum_doubling_while_less_than(max_absolute, 63.4)
+    two_pow_kta_scale = 2 ** kta_scale
+
+    ktas =
+      Enum.map(ktas, fn value ->
+        (value * two_pow_kta_scale)
+        |> Float.round()
+        |> trunc()
+      end)
+
+    %{params | kta_scale: kta_scale, ktas: ktas}
+  end
+
+  defp for_each_pixel_param(pixel_params, bit_start, bit_length, fun) do
+    for <<_::size(bit_start), param::size(bit_length),
+          _::size(16 - bit_start - bit_length) <- pixel_params>> do
+      Bytey.two_complement(param, bit_length)
+    end
+    |> Enum.with_index()
+    |> Enum.map(fn {value, i} ->
+      {x, y} = Pixels.row_and_column(i)
+      fun.(value, i, x, y)
+    end)
+  end
+
+  defp row_cols(bin_row_cols, row_scale, col_scale) do
+    {rows, cols} =
+      bin_row_cols
+      |> Bytey.bin_to_values(4)
+      |> Enum.map(&Bytey.two_complement(&1, 4))
+      |> Enum.chunk_every(4)
+      |> Enum.map(&Enum.reverse/1)
+      |> List.flatten()
+      |> Enum.split(Pixels.row_count())
+
+    row =
+      rows
+      |> Enum.map(&(&1 <<< row_scale))
+      |> :array.from_list()
+
+    col =
+      cols
+      |> Enum.map(&(&1 <<< col_scale))
+      |> :array.from_list()
+
+    {row, col}
   end
 
   def(read_alpha_scale(%{acc: <<alpha_scale::4, _::4>> <> _})) do

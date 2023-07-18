@@ -62,7 +62,10 @@ defmodule Mlc90640.Params do
     :ks_to,
     :cp,
     :alpha_scale,
-    :alphas
+    :alphas,
+    :offsets,
+    :kta_scale,
+    :ktas
   ]
 
   @type t :: %__MODULE__{
@@ -78,6 +81,9 @@ defmodule Mlc90640.Params do
           ks_to: KsTo.t(),
           cp: Cp.t(),
           alpha_scale: pos_integer(),
-          alphas: list(pos_integer())
+          alphas: list(pos_integer()),
+          offsets: list(integer()),
+          kta_scale: non_neg_integer(),
+          ktas: list(integer())
         }
 end
