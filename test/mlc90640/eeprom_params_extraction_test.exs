@@ -424,11 +424,31 @@ defmodule Mlc90640.EepromParamsExtractionTest do
                EepromParamsExtraction.kta_pixels(%Params{}, ExampleEeprom.eeprom())
     end
 
-    test "ktas" do
+    test "ktas match those calculated by the Melixis library" do
       assert %Params{ktas: ktas} =
                EepromParamsExtraction.kta_pixels(%Params{}, ExampleEeprom.eeprom())
 
       assert Enum.take(ktas, 10) == Enum.take(ExampleEeprom.expected_ktas(), 10)
+      assert ktas == ExampleEeprom.expected_ktas()
+    end
+
+    test "ktas with a negative kta rc 0" do
+      %{gain_etc: gain_etc} = eeprom = ExampleEeprom.eeprom()
+
+      eeprom = %{
+        eeprom
+        | gain_etc:
+            binary_part(gain_etc, 0, 12) <>
+              <<0xFF>> <>
+              binary_part(gain_etc, 13, byte_size(gain_etc) - 13)
+      }
+
+      assert %Params{kta_scale: kta_scale, ktas: ktas} =
+               EepromParamsExtraction.kta_pixels(%Params{}, eeprom)
+
+      assert kta_scale == 14
+      assert Enum.take(ktas, 10) == Enum.take(ExampleEeprom.ktas_with_negative_rc_0(), 10)
+      assert ktas == ExampleEeprom.ktas_with_negative_rc_0()
     end
   end
 

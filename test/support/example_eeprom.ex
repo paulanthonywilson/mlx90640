@@ -16,22 +16,18 @@ defmodule ExampleEeprom do
 
   @raw_eeprom __DIR__ |> Path.join("eeprom.bin") |> File.read!()
 
-  @expected_alphas __DIR__
-                   |> Path.join("expected_alphas")
-                   |> File.read!()
-                   |> :erlang.binary_to_term()
-
-  @expected_offsets __DIR__
-                    |> Path.join("expected_offsets")
-                    |> File.read!()
-                    |> :erlang.binary_to_term()
-
+  @expected_alphas read_expected.("expected_alphas")
+  @expected_offsets read_expected.("expected_offsets")
   @expected_ktas read_expected.("expected_ktas")
+  @ktas_with_negative_rc_0 read_expected.("ktas_with_negative_rc0")
 
   def expected_ktas, do: @expected_ktas
 
+  @doc """
+  Library hacked slightly and temporarily to get this result.
+  """
+  def ktas_with_negative_rc_0, do: @ktas_with_negative_rc_0
   def expected_alphas, do: @expected_alphas
-
   def expected_offsets, do: @expected_offsets
 
   def raw_eeprom, do: @raw_eeprom
