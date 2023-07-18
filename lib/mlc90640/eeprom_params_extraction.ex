@@ -180,25 +180,46 @@ defmodule Mlc90640.EepromParamsExtraction do
 
     ktas =
       for_each_pixel_param(pixel_offsets, 12, 3, fn value, i, _x, _y ->
-        split = 2 * (Integer.floor_div(i, 32) - Integer.floor_div(i, 64) * 2) + rem(i, 2)
         value = value * kta_scale_2
-        value = value + Enum.at(rcs, split)
+        value = value + Enum.at(rcs, pixel_index_to_odd_even_split(i))
         value / kta_scale_1
       end)
 
-    max_absolute = ktas |> Enum.map(&Kernel.abs/1) |> Enum.max()
-
-    kta_scale = Mathy.maximum_doubling_while_less_than(max_absolute, 63.4)
+    kta_scale = ktas |> Mathy.abs_max() |> Mathy.maximum_doubling_while_less_than(63.4)
     two_pow_kta_scale = 2 ** kta_scale
 
     ktas =
       Enum.map(ktas, fn value ->
-        (value * two_pow_kta_scale)
-        |> Float.round()
-        |> trunc()
+        Mathy.round_to_int(value * two_pow_kta_scale)
       end)
 
     %{params | kta_scale: kta_scale, ktas: ktas}
+  end
+
+  @spec kv_pixels(Params.t(), Eeprom.t()) :: Params.t()
+  def kv_pixels(params, %{gain_etc: gain_etc}) do
+    <<_::64, rc_0::4, rc_2::4, rc_1::4, rc_3::4, _::52, scale::4>> <> _ = gain_etc
+    rcs = Enum.map([rc_0, rc_1, rc_2, rc_3], &Bytey.two_complement(&1, 4))
+    scale = 2 ** scale
+
+    kvs =
+      for i <- 0..(Pixels.pixel_count() - 1) do
+        Enum.at(rcs, pixel_index_to_odd_even_split(i)) / scale
+      end
+
+    kv_scale = Mathy.abs_max(kvs) |> Mathy.maximum_doubling_while_less_than(63.4)
+    two_pow_kv_scale = 2 ** kv_scale
+
+    kvs =
+      Enum.map(kvs, fn value ->
+        Mathy.round_to_int(value * two_pow_kv_scale)
+      end)
+
+    %{params | kv_scale: kv_scale, kvs: kvs}
+  end
+
+  defp pixel_index_to_odd_even_split(i) do
+    2 * (Integer.floor_div(i, 32) - Integer.floor_div(i, 64) * 2) + rem(i, 2)
   end
 
   defp for_each_pixel_param(pixel_params, bit_start, bit_length, fun) do

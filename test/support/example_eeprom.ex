@@ -20,15 +20,26 @@ defmodule ExampleEeprom do
   @expected_offsets read_expected.("expected_offsets")
   @expected_ktas read_expected.("expected_ktas")
   @ktas_with_negative_rc_0 read_expected.("ktas_with_negative_rc0")
+  @expected_kvs read_expected.("expected_kvs")
+  @kvs_with_negative_rc_0 read_expected.("kvs_with_negative_rc0")
 
   def expected_ktas, do: @expected_ktas
 
-  @doc """
-  Library hacked slightly and temporarily to get this result.
-  """
-  def ktas_with_negative_rc_0, do: @ktas_with_negative_rc_0
   def expected_alphas, do: @expected_alphas
   def expected_offsets, do: @expected_offsets
+  def expected_kvs, do: @expected_kvs
+
+  @doc """
+  Also from the library, injecting in a negative value to kta rc_0
+  (row odd, column odd)
+  """
+  def ktas_with_negative_rc_0, do: @ktas_with_negative_rc_0
+
+  @doc """
+  Also from the library, injecting in a negative value to kta rc_0
+  (row odd, column odd)
+  """
+  def kvs_with_negative_rc_0, do: @kvs_with_negative_rc_0
 
   def raw_eeprom, do: @raw_eeprom
 

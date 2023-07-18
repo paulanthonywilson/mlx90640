@@ -419,12 +419,12 @@ defmodule Mlc90640.EepromParamsExtractionTest do
                EepromParamsExtraction.kta_pixels(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
     end
 
-    test "kta scale" do
+    test "scale" do
       assert %Params{kta_scale: 14} =
                EepromParamsExtraction.kta_pixels(%Params{}, ExampleEeprom.eeprom())
     end
 
-    test "ktas match those calculated by the Melixis library" do
+    test "match those calculated by the Melixis library" do
       assert %Params{ktas: ktas} =
                EepromParamsExtraction.kta_pixels(%Params{}, ExampleEeprom.eeprom())
 
@@ -432,7 +432,7 @@ defmodule Mlc90640.EepromParamsExtractionTest do
       assert ktas == ExampleEeprom.expected_ktas()
     end
 
-    test "ktas with a negative kta rc 0" do
+    test "with a negative kta rc 0" do
       %{gain_etc: gain_etc} = eeprom = ExampleEeprom.eeprom()
 
       eeprom = %{
@@ -449,6 +449,50 @@ defmodule Mlc90640.EepromParamsExtractionTest do
       assert kta_scale == 14
       assert Enum.take(ktas, 10) == Enum.take(ExampleEeprom.ktas_with_negative_rc_0(), 10)
       assert ktas == ExampleEeprom.ktas_with_negative_rc_0()
+      assert ktas |> hd() |> is_integer()
+    end
+  end
+
+  describe "kv pixels" do
+    test "preserves any already populated params values" do
+      assert %Params{vdd_25: 11} =
+               EepromParamsExtraction.kv_pixels(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
+    end
+
+    test "scale" do
+      assert %Params{kv_scale: kv_scale} =
+               EepromParamsExtraction.kv_pixels(%Params{}, ExampleEeprom.eeprom())
+
+      assert 7 == kv_scale
+    end
+
+    test "match those calculated by the Melixis library" do
+      assert %Params{kvs: kvs} =
+               EepromParamsExtraction.kv_pixels(%Params{}, ExampleEeprom.eeprom())
+
+      assert Enum.take(kvs, 10) == Enum.take(ExampleEeprom.expected_kvs(), 10)
+      assert kvs == ExampleEeprom.expected_kvs()
+      assert kvs |> hd() |> is_integer()
+    end
+
+    test "matches with Melixis library when rc_0 is tweaked to be negative" do
+      %{gain_etc: gain_etc} = eeprom = ExampleEeprom.eeprom()
+      <<_::68, rc_2::4>> <> _ = gain_etc
+
+      eeprom = %{
+        eeprom
+        | gain_etc:
+            binary_part(gain_etc, 0, 8) <>
+              <<0xF::4, rc_2::4>> <> binary_part(gain_etc, 9, byte_size(gain_etc) - 9)
+      }
+
+      assert %Params{kvs: kvs, kv_scale: kv_scale} =
+               EepromParamsExtraction.kv_pixels(%Params{}, eeprom)
+
+      assert(Enum.take(kvs, 10) == Enum.take(ExampleEeprom.kvs_with_negative_rc_0(), 10))
+
+      assert kvs == ExampleEeprom.kvs_with_negative_rc_0()
+      assert 8 = kv_scale
     end
   end
 

@@ -11,4 +11,17 @@ defmodule Mlc90640.MathyTest do
     assert 3 == Mathy.maximum_doubling_while_less_than(1, 4.01)
     assert 11 = Mathy.maximum_doubling_while_less_than(29.233, 32_767.4)
   end
+
+  test "max_abs" do
+    assert 3 == Mathy.abs_max([1, 2, 3])
+    assert 3 == Mathy.abs_max([1, 2, -3])
+    assert nil == Mathy.abs_max([])
+  end
+
+  test "round_to_int" do
+    assert 3 = Mathy.round_to_int(3.499)
+    assert 3 = Mathy.round_to_int(2.5)
+    assert -3 = Mathy.round_to_int(-2.5)
+    assert -3 = Mathy.round_to_int(-3.499)
+  end
 end
