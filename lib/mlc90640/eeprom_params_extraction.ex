@@ -1,4 +1,4 @@
-defmodule Mlc90640.EepromParamsExtraction do
+defmodule Mlc90640.EepromParams.Extraction do
   @moduledoc false
   _doc = """
   Extracts parameters from the eeprom that has been read
@@ -250,6 +250,11 @@ defmodule Mlc90640.EepromParamsExtraction do
       end)
 
     %{params | broken_pixels: broken, outlier_pixels: outliers}
+  end
+
+  @spec resolution(Params.t(), Eeprom.t()) :: Params.t()
+  def resolution(params, %{gain_etc: <<_::130, resolution::2, _::4>> <> _}) do
+    %{params | resolution_ee: resolution}
   end
 
   defp pixel_index_to_odd_even_split(i) do

@@ -71,7 +71,8 @@ defmodule Mlc90640.Params do
     :calibration_mode_ee,
     :il_chess_c,
     :broken_pixels,
-    :outlier_pixels
+    :outlier_pixels,
+    :resolution_ee
   ]
 
   @type t :: %__MODULE__{
@@ -96,6 +97,7 @@ defmodule Mlc90640.Params do
           calibration_mode_ee: non_neg_integer(),
           il_chess_c: {float(), float(), float()},
           broken_pixels: list(pixel_index :: non_neg_integer()),
-          outlier_pixels: list(pixel_index :: non_neg_integer())
+          outlier_pixels: list(pixel_index :: non_neg_integer()),
+          resolution_ee: non_neg_integer()
         }
 end
