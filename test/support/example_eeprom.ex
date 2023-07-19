@@ -43,7 +43,7 @@ defmodule ExampleEeprom do
 
   def raw_eeprom, do: @raw_eeprom
 
-  def eeprom(raw_eeprom \\ @raw_eeprom), do: Eeprom.new(raw_eeprom)
+  def eeprom(raw_eeprom \\ @raw_eeprom), do: Eeprom.Partitioned.new(raw_eeprom)
 
   def substitute_raw_bytes(bytes \\ @raw_eeprom, at, replace) do
     binary_part(bytes, 0, at) <>

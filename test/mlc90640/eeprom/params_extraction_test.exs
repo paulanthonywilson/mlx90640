@@ -1,7 +1,8 @@
-defmodule Mlc90640.EepromParams.ExtractionTest do
+defmodule Mlc90640.Eeprom.ParamsExtractionTest do
   use ExUnit.Case
   import Bitwise
-  alias Mlc90640.{Bytey, Eeprom, EepromParams.Extraction, Params}
+  alias Mlc90640.{Bytey, Eeprom.ParamsExtraction}
+  alias Mlc90640.Eeprom.{Params, Partitioned}
 
   @default_precision 1.0e-9
 
@@ -9,23 +10,23 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
     test "extracting from data sheet example" do
       <<kv_vdd, vdd_25>> = Bytey.to_unsigned_2_bytes(0x9D68)
       eeprom = with_vdd(kv_vdd, vdd_25)
-      %Params{kv_vdd: -3168, vdd_25: -13_056} = Extraction.vdd(%Params{}, eeprom)
+      %Params{kv_vdd: -3168, vdd_25: -13_056} = ParamsExtraction.vdd(%Params{}, eeprom)
     end
 
     test "from measurement" do
       eeprom = with_vdd(165, 129)
 
       assert %Params{kv_vdd: -2912, vdd_25: -12_256} ==
-               Extraction.vdd(%Params{}, eeprom)
+               ParamsExtraction.vdd(%Params{}, eeprom)
     end
 
     test "preserves any already populated params values" do
       assert %Params{v_ptat25: 11} =
-               Extraction.vdd(%Params{v_ptat25: 11}, with_vdd(0, 0))
+               ParamsExtraction.vdd(%Params{v_ptat25: 11}, with_vdd(0, 0))
     end
 
     defp with_vdd(kv_vdd, vdd_25) do
-      %Eeprom{gain_etc: <<0::48, kv_vdd, vdd_25, 0::192>>}
+      %Partitioned{gain_etc: <<0::48, kv_vdd, vdd_25, 0::192>>}
     end
   end
 
@@ -36,7 +37,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
                kt_ptat: kt_ptat,
                v_ptat25: v_ptat25,
                alpha_ptat: alpha_ptat
-             } = Extraction.ptat(%Params{}, %Eeprom{})
+             } = ParamsExtraction.ptat(%Params{}, %Partitioned{})
 
       assert_in_delta kv_ptat, 0.0, @default_precision
       assert_in_delta kt_ptat, 0.0, @default_precision
@@ -47,7 +48,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
     test "positive kv_ptat" do
       assert %Params{
                kv_ptat: kv_ptat
-             } = Extraction.ptat(%Params{}, with_ptat(31, 0))
+             } = ParamsExtraction.ptat(%Params{}, with_ptat(31, 0))
 
       assert_in_delta kv_ptat, 0.007568359375, @default_precision
     end
@@ -55,7 +56,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
     test "negative kv_ptat" do
       assert %Params{
                kv_ptat: kv_ptat
-             } = Extraction.ptat(%Params{}, with_ptat(33, 0))
+             } = ParamsExtraction.ptat(%Params{}, with_ptat(33, 0))
 
       assert_in_delta kv_ptat, -0.007568359375, @default_precision
     end
@@ -63,7 +64,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
     test "ktptat" do
       assert %Params{
                kt_ptat: kt_ptat
-             } = Extraction.ptat(%Params{}, with_ptat(33, 511))
+             } = ParamsExtraction.ptat(%Params{}, with_ptat(33, 511))
 
       assert_in_delta kt_ptat, 63.875, @default_precision
     end
@@ -71,7 +72,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
     test "negative ktptat" do
       assert %Params{
                kt_ptat: kt_ptat
-             } = Extraction.ptat(%Params{}, with_ptat(33, 513))
+             } = ParamsExtraction.ptat(%Params{}, with_ptat(33, 513))
 
       assert_in_delta kt_ptat, -63.875, @default_precision
     end
@@ -80,7 +81,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
       assert %Params{
                kt_ptat: kt_ptat,
                kv_ptat: kv_ptat
-             } = Extraction.ptat(%Params{}, with_ptat(0x5952))
+             } = ParamsExtraction.ptat(%Params{}, with_ptat(0x5952))
 
       assert_in_delta kt_ptat, 42.25, @default_precision
       assert_in_delta kv_ptat, 0.005371094, @default_precision
@@ -89,23 +90,23 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
     test "data sheet example ptat_25" do
       assert %Params{
                v_ptat25: 12_273
-             } = Extraction.ptat(%Params{}, with_vptat25(0x2FF1))
+             } = ParamsExtraction.ptat(%Params{}, with_vptat25(0x2FF1))
     end
 
     test "ptat25 is 2's complement" do
       assert %Params{
                v_ptat25: 32_767
-             } = Extraction.ptat(%Params{}, with_vptat25(32_767))
+             } = ParamsExtraction.ptat(%Params{}, with_vptat25(32_767))
 
       assert %Params{
                v_ptat25: -32_768
-             } = Extraction.ptat(%Params{}, with_vptat25(32_768))
+             } = ParamsExtraction.ptat(%Params{}, with_vptat25(32_768))
     end
 
     test "alpha ptat from data sheet example" do
       assert %Params{
                alpha_ptat: alpha_ptat
-             } = Extraction.ptat(%Params{}, with_ptat_occ_scale_16(0x4210))
+             } = ParamsExtraction.ptat(%Params{}, with_ptat_occ_scale_16(0x4210))
 
       assert_in_delta alpha_ptat, 9.0, @default_precision
     end
@@ -113,18 +114,18 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
     test "alpha ptat " do
       assert %Params{
                alpha_ptat: alpha_ptat
-             } = Extraction.ptat(%Params{}, with_ptat_occ_scale_16(0xFFFF))
+             } = ParamsExtraction.ptat(%Params{}, with_ptat_occ_scale_16(0xFFFF))
 
       assert_in_delta alpha_ptat, 15 / 4 + 8, @default_precision
     end
 
     test "preserves any already populated params values" do
       assert %Params{vdd_25: 11} =
-               Extraction.ptat(%Params{vdd_25: 11}, %Eeprom{})
+               ParamsExtraction.ptat(%Params{vdd_25: 11}, %Partitioned{})
     end
 
     defp with_vptat25(v_ptat25) do
-      %Eeprom{gain_etc: <<0::16, v_ptat25::16, 0::224>>}
+      %Partitioned{gain_etc: <<0::16, v_ptat25::16, 0::224>>}
     end
 
     defp with_ptat(kvptat, ktptat) do
@@ -132,11 +133,11 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
     end
 
     defp with_ptat(ptat16bit) do
-      %Eeprom{gain_etc: <<0::32, ptat16bit::16, 0::208>>}
+      %Partitioned{gain_etc: <<0::32, ptat16bit::16, 0::208>>}
     end
 
     defp with_ptat_occ_scale_16(value) do
-      %Eeprom{occ: <<value::16, 0::240>>}
+      %Partitioned{occ: <<value::16, 0::240>>}
     end
   end
 
@@ -144,45 +145,45 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
     test "using data sheet example" do
       assert %Params{
                gain: 6383
-             } = Extraction.gain(%Params{}, with_gain(0x18EF))
+             } = ParamsExtraction.gain(%Params{}, with_gain(0x18EF))
     end
 
     test "is two's complement" do
       assert %Params{
                gain: 32_767
-             } = Extraction.gain(%Params{}, with_gain(32_767))
+             } = ParamsExtraction.gain(%Params{}, with_gain(32_767))
 
       assert %Params{
                gain: -32_768
-             } = Extraction.gain(%Params{}, with_gain(32_768))
+             } = ParamsExtraction.gain(%Params{}, with_gain(32_768))
     end
 
     test "preserves existing params" do
       assert %Params{vdd_25: 11} =
-               Extraction.gain(%Params{vdd_25: 11}, %Eeprom{})
+               ParamsExtraction.gain(%Params{vdd_25: 11}, %Partitioned{})
     end
 
     defp with_gain(value) do
-      %Eeprom{gain_etc: <<value::16, 0::240>>}
+      %Partitioned{gain_etc: <<value::16, 0::240>>}
     end
   end
 
   describe "tgc" do
     test "preserves any already populated params values" do
       assert %Params{vdd_25: 11} =
-               Extraction.tgc(%Params{vdd_25: 11}, %Eeprom{})
+               ParamsExtraction.tgc(%Params{vdd_25: 11}, %Partitioned{})
     end
 
     test "with data sheet example" do
-      assert %Params{tgc: tgc} = Extraction.tgc(%Params{}, with_ksta_tgc(0xF020))
+      assert %Params{tgc: tgc} = ParamsExtraction.tgc(%Params{}, with_ksta_tgc(0xF020))
       assert_in_delta tgc, 1.0, @default_precision
     end
 
     test "2's complement tgc in data" do
-      assert %Params{tgc: tgc} = Extraction.tgc(%Params{}, with_ksta_tgc(0x007F))
+      assert %Params{tgc: tgc} = ParamsExtraction.tgc(%Params{}, with_ksta_tgc(0x007F))
       assert_in_delta tgc, 127 / 32, @default_precision
 
-      assert %Params{tgc: tgc} = Extraction.tgc(%Params{}, with_ksta_tgc(0x0080))
+      assert %Params{tgc: tgc} = ParamsExtraction.tgc(%Params{}, with_ksta_tgc(0x0080))
       assert_in_delta tgc, -128 / 32, @default_precision
     end
   end
@@ -190,18 +191,18 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
   describe "ksta" do
     test "preserves any already populated params values" do
       assert %Params{vdd_25: 11} =
-               Extraction.ksta(%Params{vdd_25: 11}, %Eeprom{})
+               ParamsExtraction.ksta(%Params{vdd_25: 11}, %Partitioned{})
     end
 
     test "with data sheet example" do
-      assert %Params{ksta: ksta} = Extraction.ksta(%Params{}, with_ksta_tgc(0xF020))
+      assert %Params{ksta: ksta} = ParamsExtraction.ksta(%Params{}, with_ksta_tgc(0xF020))
       assert_in_delta ksta, -0.001953125, @default_precision
     end
 
     test "2's complement" do
-      assert %Params{ksta: ksta} = Extraction.ksta(%Params{}, with_ksta_tgc(0x7F00))
+      assert %Params{ksta: ksta} = ParamsExtraction.ksta(%Params{}, with_ksta_tgc(0x7F00))
       assert_in_delta ksta, 127 / 8192.0, @default_precision
-      assert %Params{ksta: ksta} = Extraction.ksta(%Params{}, with_ksta_tgc(0x8000))
+      assert %Params{ksta: ksta} = ParamsExtraction.ksta(%Params{}, with_ksta_tgc(0x8000))
       assert_in_delta ksta, -128 / 8192.0, @default_precision
     end
   end
@@ -209,7 +210,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
   describe "ksto" do
     test "preserves any already populated params values" do
       assert %Params{vdd_25: 11} =
-               Extraction.ksto(%Params{vdd_25: 11}, %Eeprom{})
+               ParamsExtraction.ksto(%Params{vdd_25: 11}, %Partitioned{})
     end
 
     test "with data sheet example" do
@@ -228,7 +229,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
                  step: 20,
                  ks_to_scale: 17
                }
-             } = Extraction.ksto(%Params{}, with_ksto(0x9797, 0x9797, 0x2889))
+             } = ParamsExtraction.ksto(%Params{}, with_ksto(0x9797, 0x9797, 0x2889))
 
       assert_in_delta ks_to_0, -0.0008010864, @default_precision
       assert_in_delta ks_to_1, -0.0008010864, @default_precision
@@ -239,7 +240,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
 
     test "with varied ct and step" do
       assert %{ks_to: %{ct_2: 110, ct_3: 210, step: 10}} =
-               Extraction.ksto(%Params{}, with_ksto(0, 0, 0x01AB1))
+               ParamsExtraction.ksto(%Params{}, with_ksto(0, 0, 0x01AB1))
     end
 
     test "varying ks_scale" do
@@ -253,7 +254,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
                  ks_to_scale: 13
                }
              } =
-               Extraction.ksto(%Params{}, with_ksto(0x9797, 0x9797, 0x5))
+               ParamsExtraction.ksto(%Params{}, with_ksto(0x9797, 0x9797, 0x5))
 
       assert_in_delta ks_to_0, -0.0128173828125, @default_precision
       assert_in_delta ks_to_1, -0.0128173828125, @default_precision
@@ -273,7 +274,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
                  ks_to_scale: 8
                }
              } =
-               Extraction.ksto(%Params{}, with_ksto(0x7E7F, 0x7C7D, 0))
+               ParamsExtraction.ksto(%Params{}, with_ksto(0x7E7F, 0x7C7D, 0))
 
       assert_in_delta ks_to_0, 127 / 256, @default_precision
       assert_in_delta ks_to_1, 126 / 256, @default_precision
@@ -283,20 +284,20 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
     end
 
     defp with_ksto(ksto2_1, ksto_4_3, ct) do
-      %Eeprom{gain_etc: <<0::208, ksto2_1::16, ksto_4_3::16, ct::16>>}
+      %Partitioned{gain_etc: <<0::208, ksto2_1::16, ksto_4_3::16, ct::16>>}
     end
   end
 
   test "reading alpha scale" do
     for i <- 0..0xF do
-      eeprom = %Eeprom{acc: <<i::4, 0::252>>}
-      assert i == Extraction.read_alpha_scale(eeprom)
+      eeprom = %Partitioned{acc: <<i::4, 0::252>>}
+      assert i == ParamsExtraction.read_alpha_scale(eeprom)
     end
   end
 
   describe "extract cpp parameters" do
     test "preserves any already populated params values" do
-      assert %Params{vdd_25: 11} = Extraction.cp(%Params{vdd_25: 11}, %Eeprom{})
+      assert %Params{vdd_25: 11} = ParamsExtraction.cp(%Params{vdd_25: 11}, %Partitioned{})
     end
 
     test "matches the library extraction on a device" do
@@ -309,7 +310,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
                  offset_0: -68,
                  offset_1: -62
                }
-             } = Extraction.cp(%Params{}, ExampleEeprom.eeprom())
+             } = ParamsExtraction.cp(%Params{}, ExampleEeprom.eeprom())
 
       assert_in_delta kv, 0.375, @default_precision
       assert_in_delta kta, 4.455566e-03, @default_precision
@@ -318,33 +319,35 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
     end
 
     test "negative kta" do
-      eeprom = (59 * 2 + 1) |> ExampleEeprom.substitute_raw_bytes(<<0xFF>>) |> Eeprom.new()
-      assert %{cp: %{kta: kta}} = Extraction.cp(%Params{}, eeprom)
+      eeprom = (59 * 2 + 1) |> ExampleEeprom.substitute_raw_bytes(<<0xFF>>) |> Partitioned.new()
+      assert %{cp: %{kta: kta}} = ParamsExtraction.cp(%Params{}, eeprom)
       assert_in_delta kta, -6.103515625e-5, @default_precision
     end
 
     test "negative kv" do
-      eeprom = (59 * 2) |> ExampleEeprom.substitute_raw_bytes(<<0xFF>>) |> Eeprom.new()
-      assert %{cp: %{kv: kv}} = Extraction.cp(%Params{}, eeprom)
+      eeprom = (59 * 2) |> ExampleEeprom.substitute_raw_bytes(<<0xFF>>) |> Partitioned.new()
+      assert %{cp: %{kv: kv}} = ParamsExtraction.cp(%Params{}, eeprom)
       assert_in_delta kv, -0.125, @default_precision
     end
 
     test "positive offsets" do
-      eeprom = (58 * 2) |> ExampleEeprom.substitute_raw_bytes(<<31::6, 511::10>>) |> Eeprom.new()
+      eeprom =
+        (58 * 2) |> ExampleEeprom.substitute_raw_bytes(<<31::6, 511::10>>) |> Partitioned.new()
 
       assert %{
                cp: %{offset_0: 511, offset_1: 542}
-             } = Extraction.cp(%Params{}, eeprom)
+             } = ParamsExtraction.cp(%Params{}, eeprom)
     end
 
     test "positive alphas" do
-      eeprom = (57 * 2) |> ExampleEeprom.substitute_raw_bytes(<<31::6, 511::10>>) |> Eeprom.new()
+      eeprom =
+        (57 * 2) |> ExampleEeprom.substitute_raw_bytes(<<31::6, 511::10>>) |> Partitioned.new()
 
       assert %{cp: %{alpha_0: alpha_0, alpha_1: alpha_1}} =
-               Extraction.cp(%Params{}, eeprom)
+               ParamsExtraction.cp(%Params{}, eeprom)
 
       assert_in_delta alpha_0,
-                      511 / 2 ** (27 + Extraction.read_alpha_scale(eeprom)),
+                      511 / 2 ** (27 + ParamsExtraction.read_alpha_scale(eeprom)),
                       1.0e-12
 
       assert_in_delta alpha_1, (1 + 31 / 128) * alpha_0, 1.0e-15
@@ -371,20 +374,20 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
       eeprom = ExampleEeprom.eeprom()
 
       params
-      |> Extraction.tgc(eeprom)
-      |> Extraction.cp(eeprom)
-      |> Extraction.alpha(ExampleEeprom.eeprom())
+      |> ParamsExtraction.tgc(eeprom)
+      |> ParamsExtraction.cp(eeprom)
+      |> ParamsExtraction.alpha(ExampleEeprom.eeprom())
     end
   end
 
   describe "offsets" do
     test "preserves any already populated params values" do
-      assert %Params{vdd_25: 11} = Extraction.offsets(%Params{vdd_25: 11}, %Eeprom{})
+      assert %Params{vdd_25: 11} = ParamsExtraction.offsets(%Params{vdd_25: 11}, %Partitioned{})
     end
 
     test "matches the output from the melixis library" do
       assert %{offsets: offsets} =
-               Extraction.offsets(%Params{}, ExampleEeprom.eeprom())
+               ParamsExtraction.offsets(%Params{}, ExampleEeprom.eeprom())
 
       assert Enum.take(offsets, 10) == Enum.take(ExampleEeprom.expected_offsets(), 10)
       assert offsets == ExampleEeprom.expected_offsets()
@@ -409,24 +412,24 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
       # = -41 + 21
       # = -21
       assert %{offsets: [-21 | _]} =
-               Extraction.offsets(%Params{}, eeprom)
+               ParamsExtraction.offsets(%Params{}, eeprom)
     end
   end
 
   describe "kta_pixels" do
     test "preserves any already populated params values" do
       assert %Params{vdd_25: 11} =
-               Extraction.kta_pixels(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
+               ParamsExtraction.kta_pixels(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
     end
 
     test "scale" do
       assert %Params{kta_scale: 14} =
-               Extraction.kta_pixels(%Params{}, ExampleEeprom.eeprom())
+               ParamsExtraction.kta_pixels(%Params{}, ExampleEeprom.eeprom())
     end
 
     test "match those calculated by the Melixis library" do
       assert %Params{ktas: ktas} =
-               Extraction.kta_pixels(%Params{}, ExampleEeprom.eeprom())
+               ParamsExtraction.kta_pixels(%Params{}, ExampleEeprom.eeprom())
 
       assert Enum.take(ktas, 10) == Enum.take(ExampleEeprom.expected_ktas(), 10)
       assert ktas == ExampleEeprom.expected_ktas()
@@ -444,7 +447,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
       }
 
       assert %Params{kta_scale: kta_scale, ktas: ktas} =
-               Extraction.kta_pixels(%Params{}, eeprom)
+               ParamsExtraction.kta_pixels(%Params{}, eeprom)
 
       assert kta_scale == 14
       assert Enum.take(ktas, 10) == Enum.take(ExampleEeprom.ktas_with_negative_rc_0(), 10)
@@ -456,19 +459,19 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
   describe "kv pixels" do
     test "preserves any already populated params values" do
       assert %Params{vdd_25: 11} =
-               Extraction.kv_pixels(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
+               ParamsExtraction.kv_pixels(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
     end
 
     test "scale" do
       assert %Params{kv_scale: kv_scale} =
-               Extraction.kv_pixels(%Params{}, ExampleEeprom.eeprom())
+               ParamsExtraction.kv_pixels(%Params{}, ExampleEeprom.eeprom())
 
       assert 7 == kv_scale
     end
 
     test "match those calculated by the Melixis library" do
       assert %Params{kvs: kvs} =
-               Extraction.kv_pixels(%Params{}, ExampleEeprom.eeprom())
+               ParamsExtraction.kv_pixels(%Params{}, ExampleEeprom.eeprom())
 
       assert Enum.take(kvs, 10) == Enum.take(ExampleEeprom.expected_kvs(), 10)
       assert kvs == ExampleEeprom.expected_kvs()
@@ -487,7 +490,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
       }
 
       assert %Params{kvs: kvs, kv_scale: kv_scale} =
-               Extraction.kv_pixels(%Params{}, eeprom)
+               ParamsExtraction.kv_pixels(%Params{}, eeprom)
 
       assert(Enum.take(kvs, 10) == Enum.take(ExampleEeprom.kvs_with_negative_rc_0(), 10))
 
@@ -499,12 +502,12 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
   describe "cilc" do
     test "preserves any already populated params values" do
       assert %Params{vdd_25: 11} =
-               Extraction.cilc(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
+               ParamsExtraction.cilc(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
     end
 
     test "matches with Melixis library output" do
       assert %Params{calibration_mode_ee: calibration, il_chess_c: il_chess_c} =
-               Extraction.cilc(%Params{}, ExampleEeprom.eeprom())
+               ParamsExtraction.cilc(%Params{}, ExampleEeprom.eeprom())
 
       assert 128 = calibration
       {chess0, chess1, chess2} = il_chess_c
@@ -515,7 +518,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
 
     test "other calibration mode ee" do
       assert %{calibration_mode_ee: calibration} =
-               Extraction.cilc(%Params{}, %Eeprom{
+               ParamsExtraction.cilc(%Params{}, %Partitioned{
                  registers: <<0::160, 0xFFFF, 0::80>>
                })
 
@@ -526,9 +529,9 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
       chess_bin = <<15::5, 15::5, 31::6>>
 
       assert %{il_chess_c: {chess_0, chess_1, chess_2}} =
-               Extraction.cilc(
+               ParamsExtraction.cilc(
                  %Params{},
-                 %Eeprom{
+                 %Partitioned{
                    gain_etc: <<0::80>> <> chess_bin <> <<0::160>>
                  }
                )
@@ -542,9 +545,9 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
       chess_bin = <<16::5, 16::5, 32::6>>
 
       assert %{il_chess_c: {chess_0, chess_1, chess_2}} =
-               Extraction.cilc(
+               ParamsExtraction.cilc(
                  %Params{},
-                 %Eeprom{
+                 %Partitioned{
                    gain_etc: <<0::80>> <> chess_bin <> <<0::160>>
                  }
                )
@@ -558,14 +561,14 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
   describe "deviating pixels" do
     test "preserves any already populated params values" do
       assert %Params{vdd_25: 11} =
-               Extraction.deviants(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
+               ParamsExtraction.deviants(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
     end
 
     test "detects no anomalies when using the example snapshot from sensors" do
       # On the one hand it's great that neither of the sensors I bought from Pimoroni have
       # any defects in their pixels. On the other hand this test is not too helpful
       assert %Params{broken_pixels: [], outlier_pixels: []} =
-               Extraction.deviants(%Params{}, ExampleEeprom.eeprom())
+               ParamsExtraction.deviants(%Params{}, ExampleEeprom.eeprom())
     end
 
     test "detects anomalous pixels" do
@@ -573,7 +576,7 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
       pixels = binary_part(pixels, 0, 1528) <> <<0::16, 1::16, 0::16, 0x12FF::16>>
 
       assert %Params{broken_pixels: broken, outlier_pixels: outliers} =
-               Extraction.deviants(%Params{}, %{eeprom | pixel_offsets: pixels})
+               ParamsExtraction.deviants(%Params{}, %{eeprom | pixel_offsets: pixels})
 
       assert [766, 764] = broken
       assert [767, 765] = outliers
@@ -583,24 +586,24 @@ defmodule Mlc90640.EepromParams.ExtractionTest do
   describe "resolution pixels" do
     test "preserves any already populated params values" do
       assert %Params{vdd_25: 11} =
-               Extraction.resolution(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
+               ParamsExtraction.resolution(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
     end
 
     test "matches resolution detected by the Melixis lib" do
       assert %Params{resolution_ee: 2} =
-               Extraction.resolution(%Params{}, ExampleEeprom.eeprom())
+               ParamsExtraction.resolution(%Params{}, ExampleEeprom.eeprom())
     end
 
     test "works with a different value" do
-      eeprom = %Eeprom{
+      eeprom = %Partitioned{
         gain_etc: <<0::130, 3::2, 0::124>>
       }
 
-      assert %Params{resolution_ee: 3} = Extraction.resolution(%Params{}, eeprom)
+      assert %Params{resolution_ee: 3} = ParamsExtraction.resolution(%Params{}, eeprom)
     end
   end
 
   defp with_ksta_tgc(ksta_tgc) do
-    %Eeprom{gain_etc: <<0::192, ksta_tgc::16, 0::48>>}
+    %Partitioned{gain_etc: <<0::192, ksta_tgc::16, 0::48>>}
   end
 end

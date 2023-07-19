@@ -1,4 +1,4 @@
-defmodule Mlc90640.EepromParams.Extraction do
+defmodule Mlc90640.Eeprom.ParamsExtraction do
   @moduledoc false
   _doc = """
   Extracts parameters from the eeprom that has been read
@@ -6,14 +6,15 @@ defmodule Mlc90640.EepromParams.Extraction do
 
   import Bitwise
 
-  alias Mlc90640.{Bytey, Eeprom, Mathy, Params, Pixels}
+  alias Mlc90640.{Bytey, Mathy, Pixels}
+  alias Mlc90640.Eeprom.{Partitioned, Params}
 
   @two_pow_13 2 ** 13
 
   @scale_alpha 0.000001
 
-  @spec vdd(Params.t(), Eeprom.t()) :: Params.t()
-  def vdd(params, %Eeprom{gain_etc: gain_etc}) do
+  @spec vdd(Params.t(), Partitioned.t()) :: Params.t()
+  def vdd(params, %Partitioned{gain_etc: gain_etc}) do
     <<_::48, kv_vdd::8, vdd_25::8>> <> _ = gain_etc
 
     %{
@@ -23,8 +24,8 @@ defmodule Mlc90640.EepromParams.Extraction do
     }
   end
 
-  @spec ptat(Params.t(), Eeprom.t()) :: Params.t()
-  def ptat(params, %Eeprom{gain_etc: gain_etc, occ: occ}) do
+  @spec ptat(Params.t(), Partitioned.t()) :: Params.t()
+  def ptat(params, %Partitioned{gain_etc: gain_etc, occ: occ}) do
     <<_::16, v_ptat25::16, kv_ptat::6, kt_ptat::10>> <> _ = gain_etc
 
     kv_ptat = Bytey.two_complement(kv_ptat, 6) / 4096
@@ -37,28 +38,28 @@ defmodule Mlc90640.EepromParams.Extraction do
     %{params | kv_ptat: kv_ptat, kt_ptat: kt_ptat, v_ptat25: v_ptat25, alpha_ptat: alpha_ptat}
   end
 
-  @spec gain(Params.t(), Eeprom.t()) :: Params.t()
-  def gain(params, %Eeprom{gain_etc: gain_etc}) do
+  @spec gain(Params.t(), Partitioned.t()) :: Params.t()
+  def gain(params, %Partitioned{gain_etc: gain_etc}) do
     <<gain::16>> <> _ = gain_etc
     %{params | gain: Bytey.two_complement(gain)}
   end
 
-  @spec tgc(Params.t(), Eeprom.t()) :: Params.t()
-  def tgc(params, %Eeprom{gain_etc: gain_etc}) do
+  @spec tgc(Params.t(), Partitioned.t()) :: Params.t()
+  def tgc(params, %Partitioned{gain_etc: gain_etc}) do
     <<_::200, tgc>> <> _ = gain_etc
     tgc = Bytey.two_complement(tgc, 8) / 32
     %{params | tgc: tgc}
   end
 
-  @spec ksta(Params.t(), Eeprom.t()) :: Params.t()
-  def ksta(params, %Eeprom{gain_etc: gain_etc}) do
+  @spec ksta(Params.t(), Partitioned.t()) :: Params.t()
+  def ksta(params, %Partitioned{gain_etc: gain_etc}) do
     <<_::192, ksta>> <> _ = gain_etc
     ksta = Bytey.two_complement(ksta, 8) / 8192
     %{params | ksta: ksta}
   end
 
-  @spec ksto(Params.t(), Eeprom.t()) :: Params.t()
-  def ksto(params, %Eeprom{gain_etc: gain_etc}) do
+  @spec ksto(Params.t(), Partitioned.t()) :: Params.t()
+  def ksto(params, %Partitioned{gain_etc: gain_etc}) do
     <<_::208, ks_to_1, ks_to_0, ks_to_3, ks_to_2, _::2, step::2, ct_3::4, ct_2::4,
       ks_to_scale::4>> = gain_etc
 
@@ -87,7 +88,7 @@ defmodule Mlc90640.EepromParams.Extraction do
     %{params | ks_to: ks_to}
   end
 
-  @spec cp(Params.t(), Eeprom.t()) :: Params.t()
+  @spec cp(Params.t(), Partitioned.t()) :: Params.t()
   def cp(params, %{gain_etc: gain_etc} = eeprom) do
     <<_::128, _::4, kv_scale::4, kta_scale_1::4, _::4, alpha_1::6, alpha_0::10, offset_1::6,
       offset_0::10, kv, kta>> <> _ = gain_etc
@@ -115,7 +116,7 @@ defmodule Mlc90640.EepromParams.Extraction do
     }
   end
 
-  @spec alpha(Params.t(), Eeprom.t()) :: Params.t()
+  @spec alpha(Params.t(), Partitioned.t()) :: Params.t()
   def alpha(params, %{acc: acc, pixel_offsets: pixel_offsets}) do
     <<working_alpha_scale::4, acc_row_scale::4, acc_col_scale::4, acc_remnand_scale::4,
       alpha_ref::16>> <>
@@ -147,7 +148,7 @@ defmodule Mlc90640.EepromParams.Extraction do
     %{params | alpha_scale: alpha_scale, alphas: alphas}
   end
 
-  @spec offsets(Params.t(), Eeprom.t()) :: Params.t()
+  @spec offsets(Params.t(), Partitioned.t()) :: Params.t()
   def offsets(params, %{occ: occ, pixel_offsets: pixel_offsets}) do
     <<_::4, occ_row_scale::4, occ_col_scale::4, occ_rem_scale::4, offset_ref::16>> <> occ_row_cols =
       occ
@@ -167,7 +168,7 @@ defmodule Mlc90640.EepromParams.Extraction do
     %{params | offsets: offsets}
   end
 
-  @spec kta_pixels(Params.t(), Eeprom.t()) :: Params.t()
+  @spec kta_pixels(Params.t(), Partitioned.t()) :: Params.t()
   def kta_pixels(params, %{gain_etc: gain_etc, pixel_offsets: pixel_offsets}) do
     <<_::96, rc_0::8, rc_2::8, rc_1::8, rc_3::8, _::8, kta_scale_1::4, kta_scale_2::4>> <> _ =
       gain_etc
@@ -196,7 +197,7 @@ defmodule Mlc90640.EepromParams.Extraction do
     %{params | kta_scale: kta_scale, ktas: ktas}
   end
 
-  @spec kv_pixels(Params.t(), Eeprom.t()) :: Params.t()
+  @spec kv_pixels(Params.t(), Partitioned.t()) :: Params.t()
   def kv_pixels(params, %{gain_etc: gain_etc}) do
     <<_::64, rc_0::4, rc_2::4, rc_1::4, rc_3::4, _::52, scale::4>> <> _ = gain_etc
     rcs = Enum.map([rc_0, rc_1, rc_2, rc_3], &Bytey.two_complement(&1, 4))
@@ -218,7 +219,7 @@ defmodule Mlc90640.EepromParams.Extraction do
     %{params | kv_scale: kv_scale, kvs: kvs}
   end
 
-  @spec cilc(Params.t(), Eeprom.t()) :: Params.t()
+  @spec cilc(Params.t(), Partitioned.t()) :: Params.t()
   def cilc(params, %{registers: registers, gain_etc: gain_etc}) do
     <<_::160, device_options::16>> <> _ = registers
     calibration_mode_ee = bxor((device_options &&& 0x0800) >>> 4, 0x80)
@@ -231,7 +232,7 @@ defmodule Mlc90640.EepromParams.Extraction do
     %{params | calibration_mode_ee: calibration_mode_ee, il_chess_c: {chess0, chess1, chess2}}
   end
 
-  @spec deviants(Params.t(), Eeprom.t()) :: Params.t()
+  @spec deviants(Params.t(), Partitioned.t()) :: Params.t()
   def deviants(params, %{pixel_offsets: pixel_bin}) do
     {broken, outliers} =
       for(<<pixel::16 <- pixel_bin>>, do: pixel)
@@ -252,7 +253,7 @@ defmodule Mlc90640.EepromParams.Extraction do
     %{params | broken_pixels: broken, outlier_pixels: outliers}
   end
 
-  @spec resolution(Params.t(), Eeprom.t()) :: Params.t()
+  @spec resolution(Params.t(), Partitioned.t()) :: Params.t()
   def resolution(params, %{gain_etc: <<_::130, resolution::2, _::4>> <> _}) do
     %{params | resolution_ee: resolution}
   end

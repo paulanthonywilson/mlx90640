@@ -6,7 +6,8 @@ defmodule Mlc90640.Control do
 
   use Mlc90640.I2C
 
-  alias Mlc90640.{Bytey, Commands, Eeprom}
+  alias Mlc90640.{Bytey, Commands}
+  alias Mlc90640.Eeprom
 
   @bus_name "i2c-1"
   @mlc90640_addr 0x33
@@ -33,8 +34,8 @@ defmodule Mlc90640.Control do
   """
   @spec read_control_reg1(i2c_bus()) :: {:ok, non_neg_integer}
   def read_control_reg1(bus) do
-    case I2C.write_read(bus, @mlc90640_addr, @control_reg1_bytes, 2) do
-      {:ok, <<h, l>>} -> {:ok, h * 256 + l}
+    with {:ok, <<h, l>>} <- I2C.write_read(bus, @mlc90640_addr, @control_reg1_bytes, 2) do
+      {:ok, h * 256 + l}
     end
   end
 
@@ -53,10 +54,13 @@ defmodule Mlc90640.Control do
     end
   end
 
+  @doc """
+  Read and extract the EEPROM parameters
+  """
+  @spec read_eeprom(reference) :: {:ok, Mlc90640.Eeprom.Params.t()}
   def read_eeprom(bus) do
-    case I2C.write_read(bus, @mlc90640_addr, @eeprom_start, @eeprom_byte_size) do
-      {:ok, eeprom} ->
-        {:ok, Eeprom.new(eeprom)}
+    with {:ok, eeprom} <- I2C.write_read(bus, @mlc90640_addr, @eeprom_start, @eeprom_byte_size) do
+      {:ok, Eeprom.extract_parameters(eeprom)}
     end
   end
 

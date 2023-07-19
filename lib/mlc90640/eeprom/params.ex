@@ -1,4 +1,4 @@
-defmodule Mlc90640.Params do
+defmodule Mlc90640.Eeprom.Params do
   @moduledoc false
   _doc = """
   Holds the data extracted from the EEProm
@@ -76,28 +76,28 @@ defmodule Mlc90640.Params do
   ]
 
   @type t :: %__MODULE__{
-          kv_vdd: integer(),
-          vdd_25: integer(),
-          kv_ptat: float(),
-          kt_ptat: float(),
-          v_ptat25: integer(),
-          alpha_ptat: float(),
-          gain: integer(),
-          tgc: float(),
-          ksta: float(),
-          ks_to: KsTo.t(),
-          cp: Cp.t(),
-          alpha_scale: pos_integer(),
-          alphas: list(pos_integer()),
-          offsets: list(integer()),
-          kta_scale: non_neg_integer(),
-          ktas: list(integer()),
-          kv_scale: non_neg_integer(),
-          kvs: list(integer()),
-          calibration_mode_ee: non_neg_integer(),
-          il_chess_c: {float(), float(), float()},
-          broken_pixels: list(pixel_index :: non_neg_integer()),
-          outlier_pixels: list(pixel_index :: non_neg_integer()),
-          resolution_ee: non_neg_integer()
+          kv_vdd: nil | integer(),
+          vdd_25: nil | integer(),
+          kv_ptat: nil | float(),
+          kt_ptat: nil | float(),
+          v_ptat25: nil | integer(),
+          alpha_ptat: nil | float(),
+          gain: nil | integer(),
+          tgc: nil | float(),
+          ksta: nil | float(),
+          ks_to: nil | KsTo.t(),
+          cp: nil | Cp.t(),
+          alpha_scale: nil | pos_integer(),
+          alphas: nil | list(pos_integer()),
+          offsets: nil | list(integer()),
+          kta_scale: nil | non_neg_integer(),
+          ktas: nil | list(integer()),
+          kv_scale: nil | non_neg_integer(),
+          kvs: nil | list(integer()),
+          calibration_mode_ee: nil | non_neg_integer(),
+          il_chess_c: nil | {float(), float(), float()},
+          broken_pixels: nil | list(pixel_index :: non_neg_integer()),
+          outlier_pixels: nil | list(pixel_index :: non_neg_integer()),
+          resolution_ee: nil | non_neg_integer()
         }
 end

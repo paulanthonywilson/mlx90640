@@ -6,7 +6,7 @@ defmodule Mlc90640.ControlTest do
   import Mox
   setup :verify_on_exit!
 
-  alias Mlc90640.Bytey
+  alias Mlc90640.Eeprom.Params
 
   setup do
     Mox.set_mox_global()
@@ -27,15 +27,25 @@ defmodule Mlc90640.ControlTest do
     assert :ok == Control.stop(ref())
   end
 
-  test "reading the control registry", %{ref: ref} do
-    expect(MockI2c, :write_read, fn ^ref, address, value, length ->
-      assert 0x33 == address
-      assert value == <<128, 13>>
-      assert length == 2
-      {:ok, <<25, 1>>}
-    end)
+  describe "reading the control registry" do
+    test "returns the control registry value", %{ref: ref} do
+      expect(MockI2c, :write_read, fn ^ref, address, value, length ->
+        assert 0x33 == address
+        assert value == <<128, 13>>
+        assert length == 2
+        {:ok, <<25, 1>>}
+      end)
 
-    assert {:ok, 6401} == Control.read_control_reg1(ref())
+      assert {:ok, 6401} == Control.read_control_reg1(ref)
+    end
+
+    test "returns the error on failure" do
+      stub(MockI2c, :write_read, fn _, _, _, _ ->
+        {:error, "oh oh"}
+      end)
+
+      assert {:error, "oh oh"} = Control.read_control_reg1(ref())
+    end
   end
 
   describe "setting fps" do
@@ -51,7 +61,7 @@ defmodule Mlc90640.ControlTest do
         :ok
       end)
 
-      assert :ok == Control.set_chessboard_and_fps(ref(), 64)
+      assert :ok == Control.set_chessboard_and_fps(ref, 64)
     end
 
     test "sets chessboard" do
@@ -67,46 +77,51 @@ defmodule Mlc90640.ControlTest do
 
       assert :ok == Control.set_chessboard_and_fps(ref(), 64)
     end
+
+    test "returns the error on failure to read" do
+      stub(MockI2c, :write_read, fn _, _, _, _ ->
+        {:error, "oh oh"}
+      end)
+
+      assert {:error, "oh oh"} == Control.set_chessboard_and_fps(ref(), 64)
+    end
+
+    test "returns the error on failure to write" do
+      stub(MockI2c, :write_read, fn _, _, _, _ ->
+        {:ok, <<0, 0>>}
+      end)
+
+      stub(MockI2c, :write, fn _, _, _ ->
+        {:error, "oh boy"}
+      end)
+
+      assert {:error, "oh boy"} == Control.set_chessboard_and_fps(ref(), 64)
+    end
   end
 
   describe "read eeprom" do
-    setup do
-      eeprom_bytes =
-        0x2400..0x273F
-        |> Enum.map(&Bytey.to_unsigned_2_bytes(&1))
-        |> IO.iodata_to_binary()
-
-      {:ok, eeprom_bytes: eeprom_bytes}
-    end
-
-    test "splits into blocks", %{ref: ref, eeprom_bytes: eeprom_bytes} do
+    test "splits into blocks", %{ref: ref} do
       expect(MockI2c, :write_read, fn ^ref, 0x33, command, length ->
         assert command == <<36, 0>>
 
         assert length == 1664
-        {:ok, eeprom_bytes}
+        {:ok, ExampleEeprom.raw_eeprom()}
       end)
 
-      assert {:ok,
-              %{
-                registers: registers,
-                occ: occ,
-                acc: acc,
-                gain_etc: gain_etc,
-                pixel_offsets: pixel_offsets
-              }} = Control.read_eeprom(ref)
+      assert {:ok, params} =
+               Control.read_eeprom(ref)
 
-      assert list(0x2400, 0x240F) == Bytey.bin_to_values(registers)
-      assert list(0x2410, 0x241F) == Bytey.bin_to_values(occ)
-      assert list(0x2420, 0x242F) == Bytey.bin_to_values(acc)
-      assert list(0x2430, 0x243F) == Bytey.bin_to_values(gain_etc)
-      assert list(0x2440, 0x273F) == Bytey.bin_to_values(pixel_offsets)
+      assert %Params{v_ptat25: 12_203} = params
+    end
 
-      assert registers <> occ <> acc <> gain_etc <> pixel_offsets == eeprom_bytes
+    test "returns error if fails" do
+      stub(MockI2c, :write_read, fn _, _, _, _ ->
+        {:error, "some bad thing"}
+      end)
+
+      assert {:error, "some bad thing"} = Control.read_eeprom(ref())
     end
   end
-
-  defp list(start, finish), do: start..finish |> Enum.to_list()
 
   defp ref do
     :erlang.list_to_ref(~c"#Ref<0.1.2.3>")
