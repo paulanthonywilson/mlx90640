@@ -496,6 +496,90 @@ defmodule Mlc90640.EepromParamsExtractionTest do
     end
   end
 
+  describe "cilc" do
+    test "preserves any already populated params values" do
+      assert %Params{vdd_25: 11} =
+               EepromParamsExtraction.cilc(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
+    end
+
+    test "matches with Melixis library output" do
+      assert %Params{calibration_mode_ee: calibration, il_chess_c: il_chess_c} =
+               EepromParamsExtraction.cilc(%Params{}, ExampleEeprom.eeprom())
+
+      assert 128 = calibration
+      {chess0, chess1, chess2} = il_chess_c
+      assert_in_delta 0.5, chess0, @default_precision
+      assert_in_delta 3.5, chess1, @default_precision
+      assert_in_delta -0.25, chess2, @default_precision
+    end
+
+    test "other calibration mode ee" do
+      assert %{calibration_mode_ee: calibration} =
+               EepromParamsExtraction.cilc(%Params{}, %Eeprom{
+                 registers: <<0::160, 0xFFFF, 0::80>>
+               })
+
+      assert 0 = calibration
+    end
+
+    test "just positive il_chess_values" do
+      chess_bin = <<15::5, 15::5, 31::6>>
+
+      assert %{il_chess_c: {chess_0, chess_1, chess_2}} =
+               EepromParamsExtraction.cilc(
+                 %Params{},
+                 %Eeprom{
+                   gain_etc: <<0::80>> <> chess_bin <> <<0::160>>
+                 }
+               )
+
+      assert_in_delta 31 / 16, chess_0, @default_precision
+      assert_in_delta 15 / 2, chess_1, @default_precision
+      assert_in_delta 15 / 8, chess_2, @default_precision
+    end
+
+    test "just negative il_chess_values" do
+      chess_bin = <<16::5, 16::5, 32::6>>
+
+      assert %{il_chess_c: {chess_0, chess_1, chess_2}} =
+               EepromParamsExtraction.cilc(
+                 %Params{},
+                 %Eeprom{
+                   gain_etc: <<0::80>> <> chess_bin <> <<0::160>>
+                 }
+               )
+
+      assert_in_delta -32 / 16, chess_0, @default_precision
+      assert_in_delta -16 / 2, chess_1, @default_precision
+      assert_in_delta -16 / 8, chess_2, @default_precision
+    end
+  end
+
+  describe "deviating pixels" do
+    test "preserves any already populated params values" do
+      assert %Params{vdd_25: 11} =
+               EepromParamsExtraction.deviants(%Params{vdd_25: 11}, ExampleEeprom.eeprom())
+    end
+
+    test "detects no anomalies when using the example snapshot from sensors" do
+      # On the one hand it's great that neither of the sensors I bought from Pimoroni have
+      # any defects in their pixels. On the other hand this test is not too helpful
+      assert %Params{broken_pixels: [], outlier_pixels: []} =
+               EepromParamsExtraction.deviants(%Params{}, ExampleEeprom.eeprom())
+    end
+
+    test "detects anomalous pixels" do
+      eeprom = %{pixel_offsets: pixels} = ExampleEeprom.eeprom()
+      pixels = binary_part(pixels, 0, 1528) <> <<0::16, 1::16, 0::16, 0x12FF::16>>
+
+      assert %Params{broken_pixels: broken, outlier_pixels: outliers} =
+               EepromParamsExtraction.deviants(%Params{}, %{eeprom | pixel_offsets: pixels})
+
+      assert [766, 764] = broken
+      assert [767, 765] = outliers
+    end
+  end
+
   defp with_ksta_tgc(ksta_tgc) do
     %Eeprom{gain_etc: <<0::192, ksta_tgc::16, 0::48>>}
   end

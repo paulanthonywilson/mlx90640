@@ -218,6 +218,40 @@ defmodule Mlc90640.EepromParamsExtraction do
     %{params | kv_scale: kv_scale, kvs: kvs}
   end
 
+  @spec cilc(Params.t(), Eeprom.t()) :: Params.t()
+  def cilc(params, %{registers: registers, gain_etc: gain_etc}) do
+    <<_::160, device_options::16>> <> _ = registers
+    calibration_mode_ee = bxor((device_options &&& 0x0800) >>> 4, 0x80)
+
+    <<_::80, chess2::5, chess1::5, chess0::6>> <> _ = gain_etc
+
+    chess0 = Bytey.two_complement(chess0, 6) / 16.0
+    chess1 = Bytey.two_complement(chess1, 5) / 2.0
+    chess2 = Bytey.two_complement(chess2, 5) / 8.0
+    %{params | calibration_mode_ee: calibration_mode_ee, il_chess_c: {chess0, chess1, chess2}}
+  end
+
+  @spec deviants(Params.t(), Eeprom.t()) :: Params.t()
+  def deviants(params, %{pixel_offsets: pixel_bin}) do
+    {broken, outliers} =
+      for(<<pixel::16 <- pixel_bin>>, do: pixel)
+      |> Enum.with_index()
+      |> Enum.reduce({[], []}, fn {pixel, i}, {broken, outliers} = acc ->
+        cond do
+          0 == pixel ->
+            {[i | broken], outliers}
+
+          1 == (pixel &&& 1) ->
+            {broken, [i | outliers]}
+
+          true ->
+            acc
+        end
+      end)
+
+    %{params | broken_pixels: broken, outlier_pixels: outliers}
+  end
+
   defp pixel_index_to_odd_even_split(i) do
     2 * (Integer.floor_div(i, 32) - Integer.floor_div(i, 64) * 2) + rem(i, 2)
   end

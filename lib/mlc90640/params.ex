@@ -67,7 +67,11 @@ defmodule Mlc90640.Params do
     :kta_scale,
     :ktas,
     :kv_scale,
-    :kvs
+    :kvs,
+    :calibration_mode_ee,
+    :il_chess_c,
+    :broken_pixels,
+    :outlier_pixels
   ]
 
   @type t :: %__MODULE__{
@@ -88,6 +92,10 @@ defmodule Mlc90640.Params do
           kta_scale: non_neg_integer(),
           ktas: list(integer()),
           kv_scale: non_neg_integer(),
-          kvs: list(integer())
+          kvs: list(integer()),
+          calibration_mode_ee: non_neg_integer(),
+          il_chess_c: {float(), float(), float()},
+          broken_pixels: list(pixel_index :: non_neg_integer()),
+          outlier_pixels: list(pixel_index :: non_neg_integer())
         }
 end
